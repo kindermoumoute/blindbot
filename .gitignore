@@ -1,0 +1,5 @@
+run.sh
+veille.go
+vendor/
+*.exe
+.idea/
