@@ -3,3 +3,4 @@ veille.go
 vendor/
 *.exe
 .idea/
+blindbot
