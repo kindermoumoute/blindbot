@@ -4,5 +4,10 @@ services:
 language: go
 go:
   - "1.10"
+env:
+  global:
+    - secure: "IUR0y6LUgOTVo6WTfk1gVxjAv6Ph7XiwrZD1qS3c0inrSY+PRAiW+XT5gRx4GgklrGTuIrEyAdzykKI6ovwZ1DTCvQrevu1fXbqhOSZJFyK5A7YiHWaKOA45JalbLnvKp5MBSBAVQdZvTjj7CChc8KT8tt8t7oepXSBjAQCBt929zMpVbnoEZ1E/VMu6VnrdRwW7VeM3hSp7DGXyIYYKQKtnrFI97lQuRToTP18ZFjcAmfqUDka8/fdA35o1OlkYMbj9mXH0gUJ5iPuHFWnqBjPocLRbV1DlwJF9X2YUCNcEV9poZ/rb9JD1SvlWhhlCggH4wCmMg8/nh8syIlHjzhXkDQNYh2L6ZyO68rSFCdQyuILeShPOKLIJHA4MC9NJNkOgWd5gluKXxPFwoIUnemMLk1Th1freKAUoJiKA2jigyvLuDE6+Dgpa9N4xnOfWLoNuGEVu3O4+H09/NI6Qw7geTzzQtlBTTokn6Dzuik8ZJrsPisg/xkB8DeCUQSflzNmXxqKLe3glMxgYyhhdavPgQfjvuYOz+AiDy+wF7KgNqdwaXG/kxBIRWrb7soHx/LCom50Y5P3ooFZX9+1E1AwarNG2yucT2gI2LYfSlefCUFmF/c6sWQh4w6KKCWJoaqbHEizJMGutKgGyDiGXiL6OggrBc3dqoeX47eUxJqo="
 notifications:
   email: false
+after_success:
+  - scripts/build-and-publish.sh
