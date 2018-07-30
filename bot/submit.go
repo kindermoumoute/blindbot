@@ -73,7 +73,7 @@ func (b *Bot) youtubeURL(ev *slack.MessageEvent) {
 				return
 			}
 			entry := newEntry(youtubeID, ev.User, time.Now())
-			b.entries[youtubeID] = entry
+			b.entries[entry.hashedYoutubeID] = entry
 
 			url, err := vid.GetDownloadURL(best)
 			if err != nil {
