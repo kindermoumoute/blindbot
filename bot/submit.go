@@ -39,15 +39,15 @@ func (b *Bot) youtubeURL(ev *slack.MessageEvent) {
 		user.Lock()
 		user.requestLimit++
 		defer func() {
-			time.Sleep(time.Second)
+			time.Sleep(time.Second) // avoid the user to submit twice in a second
 			user.Unlock()
 			go user.decreaseLimitTimeout()
 		}()
 		log.Println("New submition by "+b.users[ev.User].name, matches[0])
 		youtubeID := videoID.FindStringSubmatch(matches[4])[2]
-		_, exist := b.entries[youtubeID]
+		entry, exist := b.entries[youtubeID]
 		if exist {
-			logInSlack("this video has already been submitted: http://"+b.domain+"/music/"+b.entries[youtubeID]+".mp3", nil)
+			logInSlack("this video has already been submitted by "+b.users[entry.userID].name+": http://"+b.domain+entry.Path(), nil)
 			return
 		}
 		if user.requestLimit < 2 {
@@ -68,8 +68,7 @@ func (b *Bot) youtubeURL(ev *slack.MessageEvent) {
 				logInSlack("No mp4 found", nil)
 				return
 			}
-			entry := ev.User + time.Now().Format("-20060102150405")
-			entryMP3 := "/music/" + entry + ".mp3"
+			entry := newEntry(youtubeID, ev.User, time.Now())
 			b.entries[youtubeID] = entry
 
 			url, err := vid.GetDownloadURL(best)
@@ -78,12 +77,12 @@ func (b *Bot) youtubeURL(ev *slack.MessageEvent) {
 				return
 			}
 
-			out, err := exec.Command("bash", "-c", "ffmpeg -i \""+url.String()+"\" -f mp3 -vn "+entryMP3).Output()
+			out, err := exec.Command("bash", "-c", "ffmpeg -i \""+url.String()+"\" -f mp3 -vn "+entry.Path()).Output()
 			if err != nil {
 				logInSlack("error while converting video to mp3 "+string(out), err)
 				return
 			}
-			b.logger(b.BTChannel.ID)(b.users[ev.User].name+" submitted a new challenge on http://"+b.domain+entryMP3, nil)
+			b.logger(b.BTChannel.ID)(b.users[ev.User].name+" submitted a new challenge on http://"+b.domain+entry.Path(), nil)
 		} else {
 			_, _, channel, err := b.RTM.OpenIMChannel(ev.User)
 			if err != nil {

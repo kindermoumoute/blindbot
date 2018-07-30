@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/nlopes/slack"
@@ -21,7 +20,7 @@ type Bot struct {
 	master   slack.User
 	teamInfo *slack.TeamInfo
 	users    map[string]*user
-	entries  map[string]string
+	entries  map[string]*entry
 	me       slack.User
 	domain   string
 }
@@ -40,13 +39,16 @@ type user struct {
 
 func New(debug bool, key, master, domain, botName, BTChannel string) (*Bot, error) {
 	var err error
-	bot := &Bot{users: make(map[string]*user), entries: make(map[string]string)}
+	bot := &Bot{users: make(map[string]*user), entries: make(map[string]*entry)}
 	files, err := ioutil.ReadDir("./music")
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, f := range files {
-		bot.entries[strings.Split(f.Name(), "-")[0]] = strings.Split(f.Name(), ".")[0]
+		youtubeID, entry := newEntryFromString(f.Name())
+		if entry != nil {
+			bot.entries[youtubeID] = entry
+		}
 	}
 	bot.domain = domain
 	bot.client = slack.New(key)
