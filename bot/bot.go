@@ -45,9 +45,9 @@ func New(debug bool, key, master, domain, botName, BTChannel string) (*Bot, erro
 		log.Fatal(err)
 	}
 	for _, f := range files {
-		youtubeID, entry := newEntryFromString(f.Name())
+		entry := newEntryFromString(f.Name())
 		if entry != nil {
-			bot.entries[youtubeID] = entry
+			bot.entries[entry.hashedYoutubeID] = entry
 		}
 	}
 	bot.domain = domain

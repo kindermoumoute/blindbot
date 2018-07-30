@@ -12,6 +12,10 @@ import (
 	"github.com/rylio/ytdl"
 )
 
+const (
+	submissionLimit = 3
+)
+
 var (
 	youtubeURL, _ = regexp.Compile(`.<*(https?\:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/(.+)>.*`)
 	videoID, _    = regexp.Compile(`^(watch\?v=)?(.*)$`)
@@ -45,12 +49,12 @@ func (b *Bot) youtubeURL(ev *slack.MessageEvent) {
 		}()
 		log.Println("New submition by "+b.users[ev.User].name, matches[0])
 		youtubeID := videoID.FindStringSubmatch(matches[4])[2]
-		entry, exist := b.entries[youtubeID]
+		entry, exist := b.entries[encryptYoutubeID(youtubeID)]
 		if exist {
 			logInSlack("this video has already been submitted by "+b.users[entry.userID].name+": http://"+b.domain+entry.Path(), nil)
 			return
 		}
-		if user.requestLimit < 2 {
+		if user.requestLimit < submissionLimit {
 			vid, err := ytdl.GetVideoInfo(youtubeID)
 			if err != nil {
 				logInSlack("Wrong YouTube ID", err)
