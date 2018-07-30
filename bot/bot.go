@@ -2,8 +2,10 @@ package bot
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/nlopes/slack"
@@ -19,7 +21,9 @@ type Bot struct {
 	master   slack.User
 	teamInfo *slack.TeamInfo
 	users    map[string]*user
+	entries  map[string]string
 	me       slack.User
+	domain   string
 }
 
 type SlackMessage struct {
@@ -34,9 +38,17 @@ type user struct {
 	requestLimit       int
 }
 
-func New(debug bool, key, master, botName, BTChannel string) (*Bot, error) {
+func New(debug bool, key, master, domain, botName, BTChannel string) (*Bot, error) {
 	var err error
-	bot := &Bot{users: make(map[string]*user)}
+	bot := &Bot{users: make(map[string]*user), entries: make(map[string]string)}
+	files, err := ioutil.ReadDir("./music")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		bot.entries[strings.Split(f.Name(), "-")[0]] = strings.Split(f.Name(), ".")[0]
+	}
+	bot.domain = domain
 	bot.client = slack.New(key)
 	bot.Logger = log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags)
 	slack.SetLogger(bot.Logger)
@@ -103,7 +115,7 @@ func (b *Bot) Run() {
 			b.RTM.SendMessage(b.RTM.NewOutgoingMessage("Hello master", b.MasterChannelID))
 
 		case *slack.MessageEvent:
-			b.youtubeURL(ev)
+			go b.youtubeURL(ev)
 
 		case *slack.PresenceChangeEvent:
 
