@@ -7,6 +7,8 @@ import (
 
 	"log"
 
+	"path/filepath"
+
 	"github.com/gorilla/mux"
 	"github.com/kindermoumoute/blindbot/bot"
 )
@@ -18,8 +20,9 @@ type FileInfo struct {
 }
 
 const (
-	root      = "./music/"
-	secretDir = "/cred"
+	musicPrefix = "/music/"
+	root        = "./music/"
+	secretDir   = "/cred"
 )
 
 func runServer(b *bot.Bot) {
@@ -27,15 +30,20 @@ func runServer(b *bot.Bot) {
 	r := mux.NewRouter()
 	r.HandleFunc("/", playerMainFrame)
 	r.HandleFunc("/submit", b.Submit)
-	r.HandleFunc("/music/{path}", file)
+	r.HandleFunc(musicPrefix, file)
+	r.HandleFunc(musicPrefix+"{path}", file)
 
 	go func() {
-		if err := http.ListenAndServe(":443", http.HandlerFunc(redirectTLS)); err != nil {
+		// switch to :http
+		if err := http.ListenAndServe(":https", http.HandlerFunc(redirectTLS)); err != nil {
 			log.Fatalf("ListenAndServe error: %v", err)
 		}
 	}()
-	log.Fatal(http.ListenAndServe(":80", r))
 
+	// remove this
+	log.Fatal(http.ListenAndServe(":http", r))
+
+	// uncomment this
 	//m := &autocert.Manager{
 	//	Cache:      autocert.DirCache(secretDir),
 	//	Prompt:     autocert.AcceptTOS,
@@ -52,6 +60,7 @@ func runServer(b *bot.Bot) {
 }
 
 func redirectTLS(w http.ResponseWriter, r *http.Request) {
+	// switch to https
 	http.Redirect(w, r, "http://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
 }
 
@@ -60,7 +69,7 @@ func playerMainFrame(w http.ResponseWriter, r *http.Request) {
 }
 
 func file(w http.ResponseWriter, r *http.Request) {
-	path := root + mux.Vars(r)["path"]
+	path := filepath.Join(root, r.URL.Path[len(musicPrefix):])
 	stat, err := os.Stat(path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)

@@ -51,7 +51,7 @@ func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 		youtubeID := videoID.FindStringSubmatch(matches[4])[2]
 		entry, exist := b.entries[encryptYoutubeID(youtubeID)]
 		if exist {
-			logInSlack("this video has already been submitted by "+b.users[entry.userID].name+": https://"+b.domain+entry.Path(), nil)
+			logInSlack("this video has already been submitted by "+b.users[entry.userID].name+": http://"+b.domain+entry.Path(), nil)
 			return
 		}
 		if user.requestLimit < submissionLimit {
@@ -86,7 +86,7 @@ func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 				logInSlack("error while converting video to mp3 "+string(out), err)
 				return
 			}
-			b.logger(b.BTChannel.ID)(b.users[userID].name+" submitted a new challenge: https://"+b.domain+entry.Path()+" "+hints, nil)
+			b.logger(b.BTChannel.ID)(b.users[userID].name+" submitted a new challenge: http://"+b.domain+entry.Path()+" "+hints, nil)
 		} else {
 			_, _, channel, err := b.RTM.OpenIMChannel(userID)
 			if err != nil {
