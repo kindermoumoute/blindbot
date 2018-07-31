@@ -2,12 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-
-	"github.com/kindermoumoute/blindbot/bot"
 )
 
 type FileInfo struct {
@@ -17,32 +14,22 @@ type FileInfo struct {
 }
 
 const (
-	filePrefix   = "/music/"
-	submitPrefix = "/submit/"
-	root         = "./music"
+	filePrefix = "/music/"
+	root       = "./music"
 )
 
-func runServer(b *bot.Bot) {
+func serveFiles() {
 	http.HandleFunc("/", playerMainFrame)
-	http.HandleFunc(submitPrefix, b.Submit)
-	http.HandleFunc(filePrefix, file)
-	go func() {
-		if err := http.ListenAndServe(":80", http.HandlerFunc(redirectTLS)); err != nil {
-			log.Fatalf("ListenAndServe error: %v", err)
-		}
-	}()
-	http.ListenAndServeTLS(":443", "cred/server.crt", "cred/server.key", nil)
-}
-
-func redirectTLS(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "https://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
+	http.HandleFunc(filePrefix, File)
+	http.ListenAndServe(":80", nil)
 }
 
 func playerMainFrame(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	http.ServeFile(w, r, "./player.html")
 }
 
-func file(w http.ResponseWriter, r *http.Request) {
+func File(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(root, r.URL.Path[len(filePrefix):])
 	stat, err := os.Stat(path)
 	if err != nil {

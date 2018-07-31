@@ -2,12 +2,13 @@ package bot
 
 import (
 	"log"
-	"net/http"
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/nlopes/slack"
 	"github.com/rylio/ytdl"
 )
 
@@ -18,28 +19,27 @@ const (
 var (
 	youtubeURL, _ = regexp.Compile(`.<*(https?\:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/(.+)>.*`)
 	videoID, _    = regexp.Compile(`^(watch\?v=)?(.*)$`)
-	submission, _ = regexp.Compile(`^"(.*)" "(.*)" "(.*)"$`)
 )
 
-func (b *Bot) Submit(w http.ResponseWriter, r *http.Request) {
-	text := r.URL.Query().Get("text")
-	channelID := r.URL.Query().Get("channel_id")
-	userID := r.URL.Query().Get("user_id")
-	matches := submission.FindStringSubmatch(text)
-	if len(matches) != 4 {
-		return
-	}
-	_, exist := b.users[userID]
-	if exist {
-		go b.youtubeURL(matches[1], channelID, userID, matches[3])
+func (b *Bot) logger(channel string) func(string, error) {
+	return func(s string, err error) {
+		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, channel))
+		if err != nil {
+			s += ", error: " + err.Error()
+		}
+		log.Println(s, err)
+		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, b.MasterChannelID))
 	}
 }
 
-func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
-	logInSlack := b.logger(channelID)
-	matches := youtubeURL.FindStringSubmatch(url)
+func (b *Bot) youtubeURL(ev *slack.MessageEvent) {
+	if ev.SubType != "" || !strings.Contains(ev.Text, "<@"+b.me.ID+">") {
+		return
+	}
+	logInSlack := b.logger(ev.Channel)
+	matches := youtubeURL.FindStringSubmatch(ev.Text)
 	if len(matches) != 0 {
-		user := b.users[userID]
+		user := b.users[ev.User]
 		user.Lock()
 		user.requestLimit++
 		defer func() {
@@ -47,11 +47,11 @@ func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 			user.Unlock()
 			go user.decreaseLimitTimeout()
 		}()
-		log.Println("New submition by "+b.users[userID].name, matches[0])
+		log.Println("New submition by "+b.users[ev.User].name, matches[0])
 		youtubeID := videoID.FindStringSubmatch(matches[4])[2]
 		entry, exist := b.entries[encryptYoutubeID(youtubeID)]
 		if exist {
-			logInSlack("this video has already been submitted by "+b.users[entry.userID].name+": https://"+b.domain+entry.Path(), nil)
+			logInSlack("this video has already been submitted by "+b.users[entry.userID].name+": http://"+b.domain+entry.Path(), nil)
 			return
 		}
 		if user.requestLimit < submissionLimit {
@@ -72,7 +72,7 @@ func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 				logInSlack("No mp4 found", nil)
 				return
 			}
-			entry := newEntry(youtubeID, userID, time.Now())
+			entry := newEntry(youtubeID, ev.User, time.Now())
 			b.entries[entry.hashedYoutubeID] = entry
 
 			url, err := vid.GetDownloadURL(best)
@@ -86,26 +86,15 @@ func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 				logInSlack("error while converting video to mp3 "+string(out), err)
 				return
 			}
-			b.logger(b.BTChannel.ID)(b.users[userID].name+" submitted a new challenge: <https://"+b.domain+entry.Path()+"|link> "+hints, nil)
+			b.logger(b.BTChannel.ID)(b.users[ev.User].name+" submitted a new challenge on http://"+b.domain+entry.Path(), nil)
 		} else {
-			_, _, channel, err := b.RTM.OpenIMChannel(userID)
+			_, _, channel, err := b.RTM.OpenIMChannel(ev.User)
 			if err != nil {
 				log.Println(err)
 			} else {
 				b.logger(channel)(strconv.Itoa(user.requestLimit)+" requests in a minute, slow down!", nil)
 			}
 		}
-	}
-}
-
-func (b *Bot) logger(channel string) func(string, error) {
-	return func(s string, err error) {
-		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, channel))
-		if err != nil {
-			s += ", error: " + err.Error()
-		}
-		log.Println(s, err)
-		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, b.MasterChannelID))
 	}
 }
 

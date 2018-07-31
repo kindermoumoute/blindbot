@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/nlopes/slack"
@@ -118,9 +117,7 @@ func (b *Bot) Run() {
 			b.RTM.SendMessage(b.RTM.NewOutgoingMessage("Hello master", b.MasterChannelID))
 
 		case *slack.MessageEvent:
-			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.me.ID+">") {
-				go b.youtubeURL(ev.Text, ev.Channel, ev.User, "")
-			}
+			go b.youtubeURL(ev)
 
 		case *slack.PresenceChangeEvent:
 

@@ -1,6 +1,6 @@
 FROM jrottenberg/ffmpeg
 WORKDIR /
-RUN mkdir /music && mkdir /cred
+RUN mkdir /music
 ADD blindbot /
 ADD player.html /
 CMD ["/blindbot"]
