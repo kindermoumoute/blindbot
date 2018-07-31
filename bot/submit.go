@@ -2,6 +2,7 @@ package bot
 
 import (
 	"log"
+	"net/http"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -19,19 +20,15 @@ var (
 	videoID, _    = regexp.Compile(`^(watch\?v=)?(.*)$`)
 )
 
-func (b *Bot) logger(channel string) func(string, error) {
-	return func(s string, err error) {
-		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, channel))
-		if err != nil {
-			s += ", error: " + err.Error()
-		}
-		log.Println(s, err)
-		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, b.MasterChannelID))
-	}
+func (b *Bot) Submit(w http.ResponseWriter, r *http.Request) {
+	text := r.URL.Query().Get("text")
+	channelID := r.URL.Query().Get("channel_id")
+	userID := r.URL.Query().Get("user_id")
+	b.youtubeURL(text, channelID, userID)
 }
 
-func (b *Bot) youtubeURL(text, channel, userID string) {
-	logInSlack := b.logger(channel)
+func (b *Bot) youtubeURL(text, channelID, userID string) {
+	logInSlack := b.logger(channelID)
 	matches := youtubeURL.FindStringSubmatch(text)
 	if len(matches) != 0 {
 		user := b.users[userID]
@@ -90,6 +87,17 @@ func (b *Bot) youtubeURL(text, channel, userID string) {
 				b.logger(channel)(strconv.Itoa(user.requestLimit)+" requests in a minute, slow down!", nil)
 			}
 		}
+	}
+}
+
+func (b *Bot) logger(channel string) func(string, error) {
+	return func(s string, err error) {
+		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, channel))
+		if err != nil {
+			s += ", error: " + err.Error()
+		}
+		log.Println(s, err)
+		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, b.MasterChannelID))
 	}
 }
 

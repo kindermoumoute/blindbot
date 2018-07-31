@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/kindermoumoute/blindbot/bot"
 )
 
 type FileInfo struct {
@@ -14,22 +16,23 @@ type FileInfo struct {
 }
 
 const (
-	filePrefix = "/music/"
-	root       = "./music"
+	filePrefix   = "/music/"
+	submitPrefix = "/submit/"
+	root         = "./music"
 )
 
-func serveFiles() {
+func runServer(b *bot.Bot) {
 	http.HandleFunc("/", playerMainFrame)
-	http.HandleFunc(filePrefix, File)
+	http.HandleFunc(submitPrefix, b.Submit)
+	http.HandleFunc(filePrefix, file)
 	http.ListenAndServe(":80", nil)
 }
 
 func playerMainFrame(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	http.ServeFile(w, r, "./player.html")
 }
 
-func File(w http.ResponseWriter, r *http.Request) {
+func file(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(root, r.URL.Path[len(filePrefix):])
 	stat, err := os.Stat(path)
 	if err != nil {
