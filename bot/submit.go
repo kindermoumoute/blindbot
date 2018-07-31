@@ -31,7 +31,7 @@ func (b *Bot) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 	_, exist := b.users[userID]
 	if exist {
-		b.youtubeURL(matches[1], channelID, userID, matches[3])
+		go b.youtubeURL(matches[1], channelID, userID, matches[3])
 	}
 }
 
