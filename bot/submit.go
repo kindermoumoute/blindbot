@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"io/ioutil"
+
 	"github.com/rylio/ytdl"
 )
 
@@ -27,11 +29,18 @@ func (b *Bot) Submit(w http.ResponseWriter, r *http.Request) {
 	userID := r.URL.Query().Get("user_id")
 	matches := submission.FindStringSubmatch(text)
 	if len(matches) != 4 {
+		log.Println(matches, text, channelID, userID, r.URL.Query(), r.URL.String())
+		defer r.Body.Close()
+		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		bodyString := string(bodyBytes)
+		log.Println(bodyString)
 		return
 	}
 	_, exist := b.users[userID]
 	if exist {
 		go b.youtubeURL(matches[1], channelID, userID, matches[3])
+	} else {
+		log.Println("UserID " + userID + " not found")
 	}
 }
 
@@ -86,7 +95,7 @@ func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 				logInSlack("error while converting video to mp3 "+string(out), err)
 				return
 			}
-			b.logger(b.BTChannel.ID)(b.users[userID].name+" submitted a new challenge: http://"+b.domain+entry.Path()+" "+hints, nil)
+			b.logger(b.BTChannel.ID)(hints+" "+b.users[userID].name+" submitted a new challenge: http://"+b.domain+entry.Path(), nil)
 		} else {
 			_, _, channel, err := b.RTM.OpenIMChannel(userID)
 			if err != nil {
