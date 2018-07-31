@@ -25,7 +25,7 @@ func runServer(b *bot.Bot) {
 	http.HandleFunc("/", playerMainFrame)
 	http.HandleFunc(submitPrefix, b.Submit)
 	http.HandleFunc(filePrefix, file)
-	http.ListenAndServe(":80", nil)
+	http.ListenAndServeTLS(":443", "cred/server.crt", "cred/server.key", nil)
 }
 
 func playerMainFrame(w http.ResponseWriter, r *http.Request) {

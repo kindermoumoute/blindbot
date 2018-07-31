@@ -1,5 +1,4 @@
 run.sh
-veille.go
 vendor/
 music/
 *.exe
