@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/kindermoumoute/blindbot/bot"
-	"golang.org/x/crypto/acme/autocert"
 )
 
 type FileInfo struct {
@@ -19,7 +18,8 @@ type FileInfo struct {
 }
 
 const (
-	root = "./music/"
+	root      = "./music/"
+	secretDir = "/cred"
 )
 
 func runServer(b *bot.Bot) {
@@ -29,7 +29,30 @@ func runServer(b *bot.Bot) {
 	r.HandleFunc("/submit", b.Submit)
 	r.HandleFunc("/music/{path}", file)
 
-	log.Fatal(http.Serve(autocert.NewListener(domain), r))
+	go func() {
+		if err := http.ListenAndServe(":443", http.HandlerFunc(redirectTLS)); err != nil {
+			log.Fatalf("ListenAndServe error: %v", err)
+		}
+	}()
+	log.Fatal(http.ListenAndServe(":80", r))
+
+	//m := &autocert.Manager{
+	//	Cache:      autocert.DirCache(secretDir),
+	//	Prompt:     autocert.AcceptTOS,
+	//	HostPolicy: autocert.HostWhitelist(domain),
+	//}
+	//
+	//ln, err := tls.Listen("tcp", ":https", m.TLSConfig())
+	//if err != nil {
+	//	log.Fatalf("ssl listener %v", err)
+	//}
+	//
+	//log.Fatal(http.Serve(ln, r))
+
+}
+
+func redirectTLS(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "http://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
 }
 
 func playerMainFrame(w http.ResponseWriter, r *http.Request) {
