@@ -86,7 +86,7 @@ func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 				logInSlack("error while converting video to mp3 "+string(out), err)
 				return
 			}
-			b.logger(b.BTChannel.ID)(b.users[userID].name+" submitted a new challenge: <https://"+b.domain+entry.Path()+"|link> "+hints, nil)
+			b.logger(b.BTChannel.ID)(b.users[userID].name+" submitted a new challenge: https://"+b.domain+entry.Path()+" "+hints, nil)
 		} else {
 			_, _, channel, err := b.RTM.OpenIMChannel(userID)
 			if err != nil {
@@ -105,6 +105,7 @@ func (b *Bot) logger(channel string) func(string, error) {
 			s += ", error: " + err.Error()
 		}
 		log.Println(s, err)
+
 		b.RTM.SendMessage(b.RTM.NewOutgoingMessage(s, b.MasterChannelID))
 	}
 }
