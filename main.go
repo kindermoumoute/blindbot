@@ -29,10 +29,10 @@ func init() {
 }
 
 func main() {
-	blindbot, err := bot.New(debug, key, master, domain, botName, channel)
+	go serveFiles()
+	thisBot, err := bot.New(debug, key, master, domain, botName, channel)
 	if err != nil {
 		panic(err)
 	}
-	go runServer(blindbot)
-	blindbot.Run()
+	thisBot.Run()
 }
