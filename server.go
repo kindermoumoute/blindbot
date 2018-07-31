@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
+	"log"
+
+	"github.com/gorilla/mux"
 	"github.com/kindermoumoute/blindbot/bot"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 type FileInfo struct {
@@ -17,25 +19,17 @@ type FileInfo struct {
 }
 
 const (
-	filePrefix   = "/music/"
-	submitPrefix = "/submit/"
-	root         = "./music"
+	root = "./music/"
 )
 
 func runServer(b *bot.Bot) {
-	http.HandleFunc("/", playerMainFrame)
-	http.HandleFunc(submitPrefix, b.Submit)
-	http.HandleFunc(filePrefix, file)
-	go func() {
-		if err := http.ListenAndServe(":80", http.HandlerFunc(redirectTLS)); err != nil {
-			log.Fatalf("ListenAndServe error: %v", err)
-		}
-	}()
-	http.ListenAndServeTLS(":443", "cred/server.crt", "cred/server.key", nil)
-}
 
-func redirectTLS(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "https://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
+	r := mux.NewRouter()
+	r.HandleFunc("/", playerMainFrame)
+	r.HandleFunc("/submit", b.Submit)
+	r.HandleFunc("/music/{path}", file)
+
+	log.Fatal(http.Serve(autocert.NewListener(domain), r))
 }
 
 func playerMainFrame(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +37,7 @@ func playerMainFrame(w http.ResponseWriter, r *http.Request) {
 }
 
 func file(w http.ResponseWriter, r *http.Request) {
-	path := filepath.Join(root, r.URL.Path[len(filePrefix):])
+	path := root + mux.Vars(r)["path"]
 	stat, err := os.Stat(path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
