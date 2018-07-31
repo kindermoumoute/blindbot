@@ -120,7 +120,7 @@ func (b *Bot) Run() {
 
 		case *slack.MessageEvent:
 			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.me.ID+">") {
-				b.youtubeURL(ev.Text, ev.Channel, ev.User)
+				b.youtubeURL(ev.Text, ev.Channel, ev.User, "")
 			}
 
 		case *slack.PresenceChangeEvent:

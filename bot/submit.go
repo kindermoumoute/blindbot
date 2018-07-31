@@ -18,18 +18,26 @@ const (
 var (
 	youtubeURL, _ = regexp.Compile(`.<*(https?\:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/(.+)>.*`)
 	videoID, _    = regexp.Compile(`^(watch\?v=)?(.*)$`)
+	submission, _ = regexp.Compile(`^"(.*)" "(.*)" "(.*)"$`)
 )
 
 func (b *Bot) Submit(w http.ResponseWriter, r *http.Request) {
 	text := r.URL.Query().Get("text")
 	channelID := r.URL.Query().Get("channel_id")
 	userID := r.URL.Query().Get("user_id")
-	b.youtubeURL(text, channelID, userID)
+	matches := submission.FindStringSubmatch(text)
+	if len(matches) != 4 {
+		return
+	}
+	_, exist := b.users[userID]
+	if exist {
+		b.youtubeURL(matches[1], channelID, userID, matches[3])
+	}
 }
 
-func (b *Bot) youtubeURL(text, channelID, userID string) {
+func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 	logInSlack := b.logger(channelID)
-	matches := youtubeURL.FindStringSubmatch(text)
+	matches := youtubeURL.FindStringSubmatch(url)
 	if len(matches) != 0 {
 		user := b.users[userID]
 		user.Lock()
@@ -78,7 +86,7 @@ func (b *Bot) youtubeURL(text, channelID, userID string) {
 				logInSlack("error while converting video to mp3 "+string(out), err)
 				return
 			}
-			b.logger(b.BTChannel.ID)(b.users[userID].name+" submitted a new challenge on http://"+b.domain+entry.Path(), nil)
+			b.logger(b.BTChannel.ID)(b.users[userID].name+" submitted a new challenge: <http://"+b.domain+entry.Path()+"|link> (hints: "+hints, nil)
 		} else {
 			_, _, channel, err := b.RTM.OpenIMChannel(userID)
 			if err != nil {
