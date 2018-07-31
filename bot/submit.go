@@ -3,6 +3,7 @@ package bot
 import (
 	"log"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -19,34 +20,51 @@ const (
 
 var (
 	youtubeURL, _ = regexp.Compile(`.<*(https?\:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/(.+)>.*`)
-	videoID, _    = regexp.Compile(`^(watch\?v=)?(.*)$`)
+	videoID, _    = regexp.Compile(`^(watch\?)?(.*)$`)
 	submission, _ = regexp.Compile(`^"(.*)" "(.*)" "(.*)"$`)
 )
 
 func (b *Bot) Submit(w http.ResponseWriter, r *http.Request) {
-	text := r.URL.Query().Get("text")
-	channelID := r.URL.Query().Get("channel_id")
-	userID := r.URL.Query().Get("user_id")
+	// read body
+	defer r.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	// extract body parameters
+	u, err := url.ParseRequestURI("/?" + string(bodyBytes))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	text := u.Query().Get("text")
+	channelID := u.Query().Get("channel_id")
+	userID := u.Query().Get("user_id")
+
+	// extract command parameters
 	matches := submission.FindStringSubmatch(text)
 	if len(matches) != 4 {
-		log.Println(matches, text, channelID, userID, r.URL.Query(), r.URL.String())
-		defer r.Body.Close()
-		bodyBytes, _ := ioutil.ReadAll(r.Body)
-		bodyString := string(bodyBytes)
-		log.Println(bodyString)
+		log.Println(matches, text, string(bodyBytes))
+		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
+
+	// submit submission
 	_, exist := b.users[userID]
 	if exist {
+		w.WriteHeader(http.StatusCreated)
 		go b.youtubeURL(matches[1], channelID, userID, matches[3])
 	} else {
 		log.Println("UserID " + userID + " not found")
+		w.WriteHeader(http.StatusNotFound)
 	}
 }
 
-func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
+func (b *Bot) youtubeURL(urlText, channelID, userID, hints string) {
 	logInSlack := b.logger(channelID)
-	matches := youtubeURL.FindStringSubmatch(url)
+	matches := youtubeURL.FindStringSubmatch(urlText)
 	if len(matches) != 0 {
 		user := b.users[userID]
 		user.Lock()
@@ -57,13 +75,23 @@ func (b *Bot) youtubeURL(url, channelID, userID, hints string) {
 			go user.decreaseLimitTimeout()
 		}()
 		log.Println("New submition by "+b.users[userID].name, matches[0])
-		youtubeID := videoID.FindStringSubmatch(matches[4])[2]
+		IDMatches := videoID.FindStringSubmatch(matches[4])
+		if IDMatches[1] == "" {
+			IDMatches[2] = "v=" + IDMatches[2]
+		}
+		u, err := url.ParseRequestURI("/?" + IDMatches[2])
+		if err != nil {
+			logInSlack("wrong URI", err)
+			return
+		}
+		youtubeID := u.Query().Get("v")
 		entry, exist := b.entries[encryptYoutubeID(youtubeID)]
 		if exist {
 			logInSlack("this video has already been submitted by "+b.users[entry.userID].name+": http://"+b.domain+entry.Path(), nil)
 			return
 		}
 		if user.requestLimit < submissionLimit {
+			b.RTM.SendMessage(b.RTM.NewTypingMessage(b.BTChannel.ID))
 			vid, err := ytdl.GetVideoInfo(youtubeID)
 			if err != nil {
 				logInSlack("Wrong YouTube ID", err)
