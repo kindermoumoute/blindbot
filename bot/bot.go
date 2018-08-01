@@ -96,6 +96,9 @@ func (b *Bot) Run() {
 }
 
 func (b *Bot) log(v interface{}, userIDs ...string) {
+	if v == nil {
+		return
+	}
 	s := fmt.Sprintf("%v", v)
 
 	// log to Users
