@@ -120,7 +120,7 @@ func (b *BlindBot) log(v interface{}, userIDs ...string) {
 
 	// log to console
 	s = usersNicknames + s
-	log.Println(s, v)
+	log.Println(s)
 
 	// log to Master
 	b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, b.masterChannelID()))
