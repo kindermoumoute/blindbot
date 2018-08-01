@@ -121,7 +121,6 @@ func (b *Bot) announce(v interface{}, channelIDs ...string) {
 	for _, channelID := range channelIDs {
 		b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, channelID))
 	}
-	b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, b.masterChannelID()))
 }
 
 func (b *Bot) masterChannelID() string {
