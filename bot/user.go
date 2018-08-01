@@ -34,11 +34,12 @@ func (b *Bot) scanUsers(masterEmail, botName string) error {
 			b.masterID = u.ID
 			err = nil
 		}
-		if u.IsBot && u.Name == botName {
+		if !u.IsBot {
+			b.users[u.ID] = &user{
+				name: u.Name,
+			}
+		} else if u.Name == botName {
 			b.id = u.ID
-		}
-		b.users[u.ID] = &user{
-			name: u.Name,
 		}
 	}
 	return err
