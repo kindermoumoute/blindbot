@@ -10,7 +10,7 @@ import (
 
 var debug bool
 var key string
-var master string
+var masterEmail string
 var domain string
 var botName string
 var channel string
@@ -18,7 +18,7 @@ var channel string
 func init() {
 	flag.BoolVar(&debug, "debug", false, "Set the debug mode")
 	flag.StringVar(&key, "key", os.Getenv("SLACK_KEY"), "Set Slack API key")
-	flag.StringVar(&master, "master", os.Getenv("SLACK_MASTER"), "Set Slack master user")
+	flag.StringVar(&masterEmail, "masterEmail", os.Getenv("SLACK_MASTER"), "Set Slack master email")
 	flag.StringVar(&domain, "domain", os.Getenv("DOMAIN_NAME"), "Set server domain name")
 	flag.StringVar(&botName, "name", "blindbot", "Set bot user name")
 	flag.StringVar(&channel, "channel", "blindtest", "Set blind test channel")
@@ -29,7 +29,7 @@ func init() {
 }
 
 func main() {
-	blindbot, err := bot.New(debug, key, master, domain, botName, channel)
+	blindbot, err := bot.New(debug, key, masterEmail, domain, botName, channel)
 	if err != nil {
 		panic(err)
 	}

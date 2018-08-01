@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"strings"
 	"time"
@@ -18,12 +19,33 @@ type entry struct {
 	submissionDate          time.Time
 }
 
+func scanEntries() map[string]*entry {
+	e := make(map[string]*entry)
+	files, err := ioutil.ReadDir(rootPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		entry := newEntryFromString(f.Name())
+		if entry != nil {
+			e[entry.hashedYoutubeID] = entry
+		}
+	}
+	return e
+}
+
 func newEntry(youtubeID, userID string, submissionDate time.Time) *entry {
 	return &entry{
 		hashedYoutubeID: encryptYoutubeID(youtubeID),
 		userID:          userID,
 		submissionDate:  submissionDate,
 	}
+}
+
+func (b *Bot) addEntry(entry *entry) {
+	b.Lock()
+	b.entries[entry.hashedYoutubeID] = entry
+	b.Unlock()
 }
 
 func newEntryFromString(entryString string) *entry {
@@ -44,6 +66,12 @@ func newEntryFromString(entryString string) *entry {
 	}
 }
 
+func (b *Bot) getEntry(youtubeID string) (entry *entry, exist bool) {
+	b.Lock()
+	entry, exist = b.entries[encryptYoutubeID(youtubeID)]
+	b.Unlock()
+	return
+}
 func (e entry) String() string {
 	return e.hashedYoutubeID + "-" + e.userID + e.submissionDate.Format("-20060102150405")
 }
