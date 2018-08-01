@@ -18,7 +18,7 @@ type user struct {
 	channelID          string
 }
 
-func (b *Bot) scanUsers(masterEmail, botName string) error {
+func (b *BlindBot) scanUsers(masterEmail, botName string) error {
 	if b.users == nil {
 		b.users = make(map[string]*user)
 	}
@@ -45,7 +45,7 @@ func (b *Bot) scanUsers(masterEmail, botName string) error {
 	return err
 }
 
-func (b *Bot) getUsername(userID string) string {
+func (b *BlindBot) getUsername(userID string) string {
 	return b.users[userID].name
 }
 

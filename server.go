@@ -23,7 +23,7 @@ const (
 	secretDir   = "/cred"
 )
 
-func runServer(b *bot.Bot) {
+func runServer(b *bot.BlindBot) {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", playerMainFrame)
