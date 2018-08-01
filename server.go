@@ -2,11 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
-
-	"log"
-
 	"path/filepath"
 
 	"github.com/gorilla/mux"
@@ -29,7 +27,7 @@ func runServer(b *bot.Bot) {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", playerMainFrame)
-	r.HandleFunc("/submit", b.Submit)
+	r.HandleFunc("/submit", b.SubmitHandler)
 	r.HandleFunc(musicPrefix, file)
 	r.HandleFunc(musicPrefix+"{path}", file)
 

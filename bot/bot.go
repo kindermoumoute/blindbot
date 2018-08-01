@@ -2,7 +2,6 @@ package bot
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -11,19 +10,22 @@ import (
 	"github.com/nlopes/slack"
 )
 
-type Bot struct {
-	MasterChannelID string
-	BTChannel       slack.Channel
-	Logger          *log.Logger
+var (
+	ErrBlindTestChannelNotFound = fmt.Errorf("BlindTest channel not found")
+)
 
-	client   *slack.Client
-	RTM      *slack.RTM
-	master   slack.User
-	teamInfo *slack.TeamInfo
-	users    map[string]*user
-	entries  map[string]*entry
-	me       slack.User
-	domain   string
+type Bot struct {
+	sync.Mutex
+	masterID           string
+	id                 string
+	domain             string
+	blindTestChannelID string
+	logger             *log.Logger
+	users              map[string]*user
+	entries            map[string]*entry
+
+	client *slack.Client
+	rtm    *slack.RTM
 }
 
 type SlackMessage struct {
@@ -31,109 +33,94 @@ type SlackMessage struct {
 	TeamID int
 }
 
-type user struct {
-	sync.Mutex
-	name               string
-	requestVeilleCount int
-	requestLimit       int
-}
-
-func New(debug bool, key, master, domain, botName, BTChannel string) (*Bot, error) {
+func New(debug bool, key, masterEmail, domain, botName, BlindTestChannel string) (*Bot, error) {
 	var err error
-	bot := &Bot{users: make(map[string]*user), entries: make(map[string]*entry)}
-	files, err := ioutil.ReadDir("./music")
-	if err != nil {
-		log.Fatal(err)
+	bot := &Bot{
+		users:   make(map[string]*user),
+		entries: scanEntries(),
+		domain:  domain,
+		client:  slack.New(key),
+		logger:  log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
 	}
-	for _, f := range files {
-		entry := newEntryFromString(f.Name())
-		if entry != nil {
-			bot.entries[entry.hashedYoutubeID] = entry
-		}
-	}
-	bot.domain = domain
-	bot.client = slack.New(key)
-	bot.Logger = log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags)
-	slack.SetLogger(bot.Logger)
+
+	slack.SetLogger(bot.logger)
 	bot.client.SetDebug(debug)
-	users, err := bot.client.GetUsers()
+
+	// scan existing users
+	err = bot.scanUsers(masterEmail, botName)
 	if err != nil {
 		return nil, err
-	}
-	errMasterNotFound := fmt.Errorf("Master not found")
-	for _, u := range users {
-		if u.Profile.Email == master {
-			bot.master = u
-			errMasterNotFound = nil
-		}
-		if u.IsBot && u.Name == botName {
-			bot.me = u
-		}
-		bot.users[u.ID] = &user{
-			name: u.Name,
-		}
-	}
-	if errMasterNotFound != nil {
-		return nil, errMasterNotFound
 	}
 
 	channels, err := bot.client.GetChannels(true)
 	if err != nil {
 		return nil, err
 	}
-	errVeilleChan := fmt.Errorf(BTChannel + " channel not found")
+
 	for _, channel := range channels {
-		if channel.Name == BTChannel {
-			bot.BTChannel = channel
-			errVeilleChan = nil
+		if channel.Name == BlindTestChannel {
+			bot.blindTestChannelID = channel.ID
+			return bot, nil
 		}
 	}
-	if errVeilleChan != nil {
-		return nil, errVeilleChan
-	}
 
-	bot.teamInfo, err = bot.client.GetTeamInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	return bot, nil
+	return nil, ErrBlindTestChannelNotFound
 }
 
 func (b *Bot) Run() {
-	b.RTM = b.client.NewRTM()
-	go b.RTM.ManageConnection()
-	for msg := range b.RTM.IncomingEvents {
+	b.rtm = b.client.NewRTM()
+	go b.rtm.ManageConnection()
+	for msg := range b.rtm.IncomingEvents {
 		switch ev := msg.Data.(type) {
-		case *slack.HelloEvent:
-			// Ignore hello
-
 		case *slack.ConnectedEvent:
-			log.Println("Connected to " + b.teamInfo.Name)
-			_, _, channel, err := b.RTM.OpenIMChannel(b.master.ID)
-			if err != nil {
-				panic(err)
+			for userID := range b.users {
+				_, _, channel, err := b.rtm.OpenIMChannel(userID)
+				if err != nil {
+					log.Println("cannot get channel ID for user " + b.getUsername(userID))
+					continue
+				}
+				b.users[userID].channelID = channel
 			}
-			b.MasterChannelID = channel
-			b.RTM.SendMessage(b.RTM.NewOutgoingMessage("Hello master", b.MasterChannelID))
+			b.log("Hello Master.")
 
 		case *slack.MessageEvent:
-			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.me.ID+">") {
-				go b.youtubeURL(ev.Text, ev.Channel, ev.User, "")
+			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.id+">") {
+				go b.submitWithLogs(ev.Text, ev.User)
 			}
-
-		case *slack.PresenceChangeEvent:
-
-		case *slack.LatencyReport:
-
-		case *slack.RTMError:
-
 		case *slack.InvalidAuthEvent:
-			b.Logger.Printf("Invalid credentials")
+			b.logger.Printf("Invalid credentials")
 			return
-
 		default:
-
 		}
 	}
+}
+
+func (b *Bot) log(v interface{}, userIDs ...string) {
+	s := fmt.Sprintf("%v", v)
+
+	// log to Users
+	usersNicknames := ""
+	for _, userID := range userIDs {
+		b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, b.users[userID].channelID))
+		usersNicknames += b.getUsername(userID) + ", "
+	}
+
+	// log to console
+	s = usersNicknames + s
+	log.Println(s, v)
+
+	// log to Master
+	b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, b.masterChannelID()))
+}
+
+func (b *Bot) announce(v interface{}, channelIDs ...string) {
+	s := fmt.Sprintf("%v", v)
+	for _, channelID := range channelIDs {
+		b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, channelID))
+	}
+	b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, b.masterChannelID()))
+}
+
+func (b *Bot) masterChannelID() string {
+	return b.users[b.masterID].channelID
 }
