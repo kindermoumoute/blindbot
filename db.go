@@ -2,6 +2,11 @@ package main
 
 import (
 	"flag"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"log"
 
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/kindermoumoute/blindbot/bot"
@@ -33,11 +38,19 @@ func initDB() *db.DB {
 			}
 		}
 		if !exist {
+			log.Println("Create collection", collectionName)
 			if err := myDB.Create(collectionName); err != nil {
 				panic(err)
 			}
 		}
 	}
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	go func() {
+		<-sigs
+		myDB.Close()
+	}()
 
 	return myDB
 }

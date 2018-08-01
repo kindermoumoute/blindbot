@@ -84,12 +84,13 @@ func scanEntriesFromdb(entriesDB *db.Col) map[string]*entry {
 		if json.Unmarshal(docContent, &entryDoc) != nil {
 			log.Fatalln("cannot deserialize")
 		}
+
 		entry := &entry{
-			hashedYoutubeID: entryDoc["submitterID"].(string),
-			submitterID:     entryDoc["youtubeID"].(string),
-			submissionDate:  entryDoc["submissionDate"].(time.Time),
+			hashedYoutubeID: entryDoc["youtubeID"].(string),
+			submitterID:     entryDoc["submitterID"].(string),
 			docID:           id,
 		}
+		entry.submissionDate, _ = time.Parse(time.RFC3339, entryDoc["submissionDate"].(string))
 
 		winner, exist := entryDoc["winner"].(string)
 		if exist {
@@ -105,6 +106,8 @@ func scanEntriesFromdb(entriesDB *db.Col) map[string]*entry {
 
 		return true
 	})
+
+	log.Println(len(entriesMap), "entries loaded")
 	return entriesMap
 }
 
