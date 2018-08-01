@@ -29,7 +29,8 @@ func init() {
 }
 
 func main() {
-	blindbot, err := bot.New(debug, key, masterEmail, domain, botName, channel)
+	db := initDB()
+	blindbot, err := bot.New(debug, key, masterEmail, domain, botName, channel, db)
 	if err != nil {
 		panic(err)
 	}

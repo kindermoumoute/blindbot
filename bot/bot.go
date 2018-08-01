@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/nlopes/slack"
 )
 
@@ -14,7 +15,7 @@ var (
 	ErrBlindTestChannelNotFound = fmt.Errorf("BlindTest channel not found")
 )
 
-type Bot struct {
+type BlindBot struct {
 	sync.Mutex
 	masterID           string
 	id                 string
@@ -26,6 +27,7 @@ type Bot struct {
 
 	client *slack.Client
 	rtm    *slack.RTM
+	db     *db.DB
 }
 
 type SlackMessage struct {
@@ -33,41 +35,42 @@ type SlackMessage struct {
 	TeamID int
 }
 
-func New(debug bool, key, masterEmail, domain, botName, BlindTestChannel string) (*Bot, error) {
+func New(debug bool, key, masterEmail, domain, botName, BlindTestChannel string, db *db.DB) (*BlindBot, error) {
 	var err error
-	bot := &Bot{
+	b := &BlindBot{
 		users:   make(map[string]*user),
-		entries: scanEntries(),
+		entries: scanEntries(db),
 		domain:  domain,
 		client:  slack.New(key),
 		logger:  log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
+		db:      db,
 	}
 
-	slack.SetLogger(bot.logger)
-	bot.client.SetDebug(debug)
+	slack.SetLogger(b.logger)
+	b.client.SetDebug(debug)
 
 	// scan existing users
-	err = bot.scanUsers(masterEmail, botName)
+	err = b.scanUsers(masterEmail, botName)
 	if err != nil {
 		return nil, err
 	}
 
-	channels, err := bot.client.GetChannels(true)
+	channels, err := b.client.GetChannels(true)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, channel := range channels {
 		if channel.Name == BlindTestChannel {
-			bot.blindTestChannelID = channel.ID
-			return bot, nil
+			b.blindTestChannelID = channel.ID
+			return b, nil
 		}
 	}
 
 	return nil, ErrBlindTestChannelNotFound
 }
 
-func (b *Bot) Run() {
+func (b *BlindBot) Run() {
 	b.rtm = b.client.NewRTM()
 	go b.rtm.ManageConnection()
 	for msg := range b.rtm.IncomingEvents {
@@ -87,6 +90,13 @@ func (b *Bot) Run() {
 			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.id+">") {
 				go b.submitWithLogs(ev.Text, ev.User)
 			}
+			if ev.Channel == b.masterChannelID() && strings.Contains(ev.Text, "show entries") {
+				b.Lock()
+				for _, entry := range b.entries {
+					b.announce(entry, b.masterChannelID())
+				}
+				b.Unlock()
+			}
 		case *slack.InvalidAuthEvent:
 			b.logger.Printf("Invalid credentials")
 			return
@@ -95,7 +105,7 @@ func (b *Bot) Run() {
 	}
 }
 
-func (b *Bot) log(v interface{}, userIDs ...string) {
+func (b *BlindBot) log(v interface{}, userIDs ...string) {
 	if v == nil {
 		return
 	}
@@ -116,13 +126,13 @@ func (b *Bot) log(v interface{}, userIDs ...string) {
 	b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, b.masterChannelID()))
 }
 
-func (b *Bot) announce(v interface{}, channelIDs ...string) {
+func (b *BlindBot) announce(v interface{}, channelIDs ...string) {
 	s := fmt.Sprintf("%v", v)
 	for _, channelID := range channelIDs {
 		b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, channelID))
 	}
 }
 
-func (b *Bot) masterChannelID() string {
+func (b *BlindBot) masterChannelID() string {
 	return b.users[b.masterID].channelID
 }

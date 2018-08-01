@@ -1,7 +1,9 @@
 FROM jrottenberg/ffmpeg
 WORKDIR /
-RUN mkdir /music && mkdir /cred
+
 ADD blindbot /
 ADD player.html /
+RUN mkdir /music /cred /db
+
 CMD ["/blindbot"]
 ENTRYPOINT  [""]

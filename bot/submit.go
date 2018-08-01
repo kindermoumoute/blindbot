@@ -23,7 +23,7 @@ var (
 	submission, _ = regexp.Compile(`^.*((http(s|):|)\/\/)?(www\.|)?yout(.*?)\/(embed\/|watch.*?v=|)([a-z_A-Z0-9\-]{11}).* "(.*)" "(.*)".*$`)
 )
 
-func (b *Bot) SubmitHandler(w http.ResponseWriter, r *http.Request) {
+func (b *BlindBot) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	// read body
 	defer r.Body.Close()
 	bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -39,36 +39,36 @@ func (b *Bot) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 	text := u.Query().Get("text")
-	userID := u.Query().Get("user_id")
+	submitterID := u.Query().Get("user_id")
 
 	// submit submission
-	_, exist := b.users[userID]
+	_, exist := b.users[submitterID]
 	if exist {
-		go b.submitWithLogs(text, userID)
+		go b.submitWithLogs(text, submitterID)
 		w.WriteHeader(http.StatusCreated)
 	} else {
-		log.Println("UserID "+userID+" not found", err)
+		log.Println("UserID "+submitterID+" not found", err)
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
 
-func (b *Bot) submitWithLogs(text, userID string) {
-	b.log(b.submit(text, userID), userID)
+func (b *BlindBot) submitWithLogs(text, submitterID string) {
+	b.log(b.submit(text, submitterID), submitterID)
 }
 
-// userID MUST exist when calling this function
-func (b *Bot) submit(text, userID string) error {
+// submitterID MUST exist when calling this function
+func (b *BlindBot) submit(text, submitterID string) error {
 	matches := submission.FindStringSubmatch(text)
 	if len(matches) == 0 {
 		return fmt.Errorf("this submission does not follow the submission format")
 	}
-	log.Println("New submition by "+b.getUsername(userID), matches[0])
+	log.Println("New submition by "+b.getUsername(submitterID), matches[0])
 
 	// extract variables
 	youtubeID := matches[7]
-	//answers := matches[8]	// unimplemented
+	answers := matches[8]
 	hints := matches[9]
-	user := b.users[userID]
+	user := b.users[submitterID]
 
 	// apply rate limit
 	user.increaseRateLimit()
@@ -77,7 +77,7 @@ func (b *Bot) submit(text, userID string) error {
 	// check if this entry already exists
 	entry, exist := b.getEntry(youtubeID)
 	if exist {
-		return fmt.Errorf("this video has already been submitted by %s: %s://%s%s", b.getUsername(entry.userID), httpRoot, b.domain, entry.Path())
+		return fmt.Errorf("this video has already been submitted by %s: %s://%s%s", b.getUsername(entry.submitterID), httpRoot, b.domain, entry.Path())
 	}
 
 	// check is user is rate limited
@@ -86,11 +86,11 @@ func (b *Bot) submit(text, userID string) error {
 	}
 
 	// create entry
-	return b.createEntry(youtubeID, userID, hints)
+	return b.createEntry(youtubeID, submitterID, answers, hints)
 }
 
 // download MP3 and create entry for the video
-func (b *Bot) createEntry(youtubeID, userID, hints string) error {
+func (b *BlindBot) createEntry(youtubeID, submitterID, answers, hints string) error {
 	b.rtm.SendMessage(b.rtm.NewTypingMessage(b.blindTestChannelID))
 
 	// get video info
@@ -118,7 +118,7 @@ func (b *Bot) createEntry(youtubeID, userID, hints string) error {
 	}
 
 	// download mp3
-	entry := newEntry(youtubeID, userID, time.Now())
+	entry := newEntry(youtubeID, submitterID, answers, time.Now())
 	out, err := exec.Command("bash", "-c", "ffmpeg -i \""+url.String()+"\" -f mp3 -vn "+entry.Path()).Output()
 	if err != nil {
 		return fmt.Errorf("cannot convert video to mp3 %s %v", out, err)
@@ -126,7 +126,7 @@ func (b *Bot) createEntry(youtubeID, userID, hints string) error {
 
 	// create new entry
 	b.addEntry(entry)
-	s := fmt.Sprintf("%s %s submitted a new challenge: %s://%s%s", hints, b.users[userID].name, httpRoot, b.domain, entry.Path())
+	s := fmt.Sprintf("%s %s submitted a new challenge: %s://%s%s", hints, b.users[submitterID].name, httpRoot, b.domain, entry.Path())
 	b.announce(s, b.blindTestChannelID)
 
 	return nil
