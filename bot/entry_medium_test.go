@@ -40,6 +40,8 @@ func TestEntries(t *testing.T) {
 
 	// reload from db
 	b.entries = scanEntriesFromdb(entriesDB)
+
+	assert.Len(t, b.entries, 1)
 	entry, exist = b.getEntry(youtubeID)
 	assert.True(t, exist)
 	assert.Equal(t, entry.answers, answers)

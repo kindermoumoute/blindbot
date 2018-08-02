@@ -126,18 +126,6 @@ func (b *BlindBot) getEntry(youtubeID string) (entry *entry, exist bool) {
 	return
 }
 
-func (b *BlindBot) updateAnswers(entry *entry, answers string) error {
-	b.Lock()
-	b.entries[entry.hashedYoutubeID].answers = answers
-	id := entry.docID
-	b.Unlock()
-	err := b.db.Use(EntryCollection).Update(id, entry.toMap())
-	if err == nil {
-		err = fmt.Errorf("Successfully updated answers. :+1:")
-	}
-	return err
-}
-
 func (e entry) toMap() map[string]interface{} {
 	return map[string]interface{}{
 		"submitterID":     e.submitterID,
