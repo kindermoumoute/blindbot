@@ -55,11 +55,7 @@ func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChan
 	slack.SetLogger(b.logger)
 	b.writeClient.SetDebug(debug)
 
-	for _, entry := range b.entries {
-		if entry.threadID != "" {
-			b.entriesByThreadID[entry.threadID] = entry
-		}
-	}
+	b.syncEntries()
 	log.Printf("%d loaded, %d with threadID\n", len(b.entries), len(b.entriesByThreadID))
 
 	// TODO: store users in database
@@ -127,23 +123,8 @@ func (b *BlindBot) Run() {
 				go b.log(b.validateAnswer(ev))
 			}
 
-			if ev.Channel == b.masterChannelID() && strings.Contains(ev.Text, "show entries") {
-				go func() {
-					b.Lock()
-					message := ""
-					count := 0
-					for _, entry := range b.entries {
-						message += entry.String() + "\n"
-						count++
-						if count%50 == 0 {
-							b.announce(message, b.masterChannelID())
-							message = ""
-						}
-					}
-
-					b.announce(message, b.masterChannelID())
-					b.Unlock()
-				}()
+			if ev.Channel == b.masterChannelID() {
+				go b.log(b.masterCommands(ev))
 			}
 		case *slack.InvalidAuthEvent:
 			b.logger.Printf("Invalid credentials")
@@ -182,7 +163,6 @@ func (b *BlindBot) announce(v interface{}, channelIDs ...string) []string {
 		params.AsUser = true
 		_, threadID, _ := b.writeClient.PostMessage(channelID, s, params)
 		threadIDs = append(threadIDs, threadID)
-		//b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, channelID))
 	}
 	return threadIDs
 }

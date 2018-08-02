@@ -15,8 +15,12 @@ import (
 )
 
 const (
-	rootPath        = "/music/"
 	EntryCollection = "entries"
+)
+
+var (
+	rootPath             = "/music/"
+	NoErrUpdatingAnswers = fmt.Errorf("Successfully updated answers. :+1:")
 )
 
 type entry struct {
@@ -114,6 +118,13 @@ func newEntry(youtubeID, submitterID, answers string, submissionDate time.Time) 
 		answers:         answers,
 	}
 }
+func (b *BlindBot) syncEntries() {
+	for _, entry := range b.entries {
+		if entry.threadID != "" {
+			b.entriesByThreadID[entry.threadID] = entry
+		}
+	}
+}
 
 func (b *BlindBot) addEntry(entry *entry) error {
 	var err error
@@ -157,7 +168,7 @@ func (b *BlindBot) updateAnswers(entry *entry, answers string) error {
 	b.Unlock()
 	err := b.updateEntry(entry)
 	if err == nil {
-		err = fmt.Errorf("Successfully updated answers. :+1:")
+		err = NoErrUpdatingAnswers
 	}
 	return err
 }
@@ -175,6 +186,30 @@ func (b *BlindBot) updateThread(entry *entry, threadID string) error {
 	b.entriesByThreadID[entry.threadID] = entry
 	b.Unlock()
 	return b.updateEntry(entry)
+}
+
+func (b *BlindBot) deleteEntry(hashedYoutubeID string) error {
+	b.Lock()
+	defer b.Unlock()
+
+	entry, exist := b.entries[hashedYoutubeID]
+	if !exist {
+		return fmt.Errorf("no entry with this name")
+	}
+
+	// remove from memory cache
+	_, exist = b.entriesByThreadID[entry.hashedYoutubeID]
+	if exist {
+		delete(b.entriesByThreadID, entry.hashedYoutubeID)
+	}
+	delete(b.entries, entry.hashedYoutubeID)
+
+	// remove from db
+	if err := b.db.Use(EntryCollection).Delete(entry.docID); err != nil {
+		return err
+	}
+	// remove file
+	return os.Remove(entry.Path())
 }
 
 func (e entry) String() string {
