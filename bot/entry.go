@@ -39,9 +39,9 @@ func scanEntries(db *db.DB) map[string]*entry {
 			e[entry.hashedYoutubeID] = entry
 			log.Println("migrating " + entry.hashedYoutubeID + " to database")
 			e[entry.hashedYoutubeID].docID, err = entriesDB.Insert(map[string]interface{}{
-				"submitterID":    entry.submitterID,
-				"youtubeID":      entry.hashedYoutubeID,
-				"submissionDate": entry.submissionDate,
+				"submitterID":     entry.submitterID,
+				"hashedYoutubeID": entry.hashedYoutubeID,
+				"submissionDate":  entry.submissionDate,
 			})
 			if err != nil {
 				log.Println(err)
@@ -86,7 +86,7 @@ func scanEntriesFromdb(entriesDB *db.Col) map[string]*entry {
 		}
 
 		entry := &entry{
-			hashedYoutubeID: entryDoc["youtubeID"].(string),
+			hashedYoutubeID: entryDoc["hashedYoutubeID"].(string),
 			submitterID:     entryDoc["submitterID"].(string),
 			docID:           id,
 		}
@@ -126,10 +126,10 @@ func (b *BlindBot) addEntry(entry *entry) {
 	b.entries[entry.hashedYoutubeID] = entry
 	b.Unlock()
 	entry.docID, err = b.db.Use(EntryCollection).Insert(map[string]interface{}{
-		"submitterID":    entry.submitterID,
-		"youtubeID":      entry.hashedYoutubeID,
-		"submissionDate": entry.submissionDate,
-		"answers":        entry.answers,
+		"submitterID":     entry.submitterID,
+		"hashedYoutubeID": entry.hashedYoutubeID,
+		"submissionDate":  entry.submissionDate,
+		"answers":         entry.answers,
 	})
 	if err != nil {
 		b.log(err)
@@ -141,6 +141,20 @@ func (b *BlindBot) getEntry(youtubeID string) (entry *entry, exist bool) {
 	entry, exist = b.entries[encryptYoutubeID(youtubeID)]
 	b.Unlock()
 	return
+}
+
+func (b *BlindBot) updateAnswers(hashedYoutubeID, answers string) error {
+	b.Lock()
+	b.entries[hashedYoutubeID].answers = answers
+	id := b.entries[hashedYoutubeID].docID
+	b.Unlock()
+	err := b.db.Use(EntryCollection).Update(id, map[string]interface{}{
+		"answers": answers,
+	})
+	if err == nil {
+		err = fmt.Errorf("Successfully updated answers. :+1:")
+	}
+	return err
 }
 
 func (e entry) String() string {
