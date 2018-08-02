@@ -77,6 +77,21 @@ func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChan
 	for _, channel := range channels {
 		if channel.Name == BlindTestChannel {
 			b.blindTestChannelID = channel.ID
+			history, err := b.readClient.SearchMessages("from:"+botName+" in:"+BlindTestChannel, slack.NewSearchParameters())
+			if err != nil {
+				log.Println(err)
+			}
+			for _, entry := range b.entries {
+				if entry.threadID == "" {
+					log.Printf("Entry %s has no threadID\n", entry.hashedYoutubeID)
+					for _, message := range history.Matches {
+						if message.User == b.id && strings.Contains(message.Text, entry.Path()) {
+							log.Println("Updating threadID with ", message.Timestamp)
+							b.updateThread(entry, message.Timestamp)
+						}
+					}
+				}
+			}
 			return b, nil
 		}
 	}
