@@ -1,15 +1,16 @@
 # blindbot
 
-Blindbot is a Slack bot to play a participative blindtest. Players submit challenges and play, blindbot do the rest.
+Blindbot is a Slack bot to play participative blindtest: players submit challenges and play, blindbot do the rest.
 
 ## Use it
+Submit a Youtube link:
 ```slack
-/submit https://www.youtube.com/watch?v=oHg5SJYRHA0 "reponse 1,reponse 2" "hints"
+/submit https://www.youtube.com/watch?v=oHg5SJYRHA0 "possible answer 1,possible answer 2,..." "hints"
 ```
 
-After submitting a Youtube link, blindbot will convert it into an MP3 sample hosted on your server. Then the bot will post the challenge in the channel `blindtest` with an anonymised link. 
+Blindbot converts new submission into an MP3 sample hosted on its server. Then it posts the new challenge in the `blindtest` channel with an anonymised link. 
 
-When a player gives the right answer in the challenge's thread the bot add an emoji to let other players know this challenge is completed.
+When a player gives a right answer in the challenge's thread, blindbot adds an emoji to let other players know this challenge is completed.
 
 ## Incoming features
 * Statistics (best player, best submitter, per day, per week).
