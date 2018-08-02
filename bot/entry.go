@@ -38,11 +38,7 @@ func scanEntries(db *db.DB) map[string]*entry {
 		if entry != nil {
 			e[entry.hashedYoutubeID] = entry
 			log.Println("migrating " + entry.hashedYoutubeID + " to database")
-			e[entry.hashedYoutubeID].docID, err = entriesDB.Insert(map[string]interface{}{
-				"submitterID":     entry.submitterID,
-				"hashedYoutubeID": entry.hashedYoutubeID,
-				"submissionDate":  entry.submissionDate,
-			})
+			e[entry.hashedYoutubeID].docID, err = entriesDB.Insert(entry.toMap())
 			if err != nil {
 				log.Println(err)
 			}
@@ -88,19 +84,11 @@ func scanEntriesFromdb(entriesDB *db.Col) map[string]*entry {
 		entry := &entry{
 			hashedYoutubeID: entryDoc["hashedYoutubeID"].(string),
 			submitterID:     entryDoc["submitterID"].(string),
+			answers:         entryDoc["answers"].(string),
+			winnerID:        entryDoc["winnerID"].(string),
 			docID:           id,
 		}
 		entry.submissionDate, _ = time.Parse(time.RFC3339, entryDoc["submissionDate"].(string))
-
-		winner, exist := entryDoc["winner"].(string)
-		if exist {
-			entry.winnerID = winner
-		}
-
-		answers, exist := entryDoc["answers"].(string)
-		if exist {
-			entry.answers = answers
-		}
 
 		entriesMap[entry.hashedYoutubeID] = entry
 
@@ -125,12 +113,7 @@ func (b *BlindBot) addEntry(entry *entry) {
 	b.Lock()
 	b.entries[entry.hashedYoutubeID] = entry
 	b.Unlock()
-	entry.docID, err = b.db.Use(EntryCollection).Insert(map[string]interface{}{
-		"submitterID":     entry.submitterID,
-		"hashedYoutubeID": entry.hashedYoutubeID,
-		"submissionDate":  entry.submissionDate,
-		"answers":         entry.answers,
-	})
+	entry.docID, err = b.db.Use(EntryCollection).Insert(entry.toMap())
 	if err != nil {
 		b.log(err)
 	}
@@ -143,18 +126,26 @@ func (b *BlindBot) getEntry(youtubeID string) (entry *entry, exist bool) {
 	return
 }
 
-func (b *BlindBot) updateAnswers(hashedYoutubeID, answers string) error {
+func (b *BlindBot) updateAnswers(entry *entry, answers string) error {
 	b.Lock()
-	b.entries[hashedYoutubeID].answers = answers
-	id := b.entries[hashedYoutubeID].docID
+	b.entries[entry.hashedYoutubeID].answers = answers
+	id := entry.docID
 	b.Unlock()
-	err := b.db.Use(EntryCollection).Update(id, map[string]interface{}{
-		"answers": answers,
-	})
+	err := b.db.Use(EntryCollection).Update(id, entry.toMap())
 	if err == nil {
 		err = fmt.Errorf("Successfully updated answers. :+1:")
 	}
 	return err
+}
+
+func (e entry) toMap() map[string]interface{} {
+	return map[string]interface{}{
+		"submitterID":     e.submitterID,
+		"hashedYoutubeID": e.hashedYoutubeID,
+		"submissionDate":  e.submissionDate,
+		"answers":         e.answers,
+		"winnerID":        e.winnerID,
+	}
 }
 
 func (e entry) String() string {
