@@ -55,6 +55,13 @@ func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChan
 	slack.SetLogger(b.logger)
 	b.writeClient.SetDebug(debug)
 
+	for _, entry := range b.entries {
+		if entry.threadID != "" {
+			b.entriesByThreadID[entry.threadID] = entry
+		}
+	}
+	log.Printf("%d loaded, %d with threadID\n", len(b.entries), len(b.entriesByThreadID))
+
 	// TODO: store users in database
 	// scan existing users
 	err = b.scanUsers(masterEmail, botName)
@@ -70,32 +77,6 @@ func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChan
 	for _, channel := range channels {
 		if channel.Name == BlindTestChannel {
 			b.blindTestChannelID = channel.ID
-
-			// this part will be deprecated when the database is updated
-			for i := 0; i < 4; i++ {
-				searchParams := slack.NewSearchParameters()
-				searchParams.Page = i + 1
-				history, err := b.readClient.SearchMessages("from:"+botName+" in:"+BlindTestChannel, searchParams)
-				if err != nil {
-					log.Println(err)
-				}
-
-				for _, message := range history.Matches {
-					log.Printf("Message \"%s\" %s \n", message.Text, message.User)
-				}
-				for _, entry := range b.entries {
-					if entry.threadID == "" {
-						log.Printf("Entry %s has no threadID\n", entry.hashedYoutubeID)
-						for _, message := range history.Matches {
-							if message.User == b.id && strings.Contains(message.Text, entry.Path()) {
-								log.Println("Updating threadID for ", entry.hashedYoutubeID)
-								b.updateThread(entry, message.Timestamp)
-							}
-						}
-					}
-				}
-			}
-			// end of deprecation
 			return b, nil
 		}
 	}
@@ -127,8 +108,8 @@ func (b *BlindBot) Run() {
 			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.id+">") {
 				go b.submitWithLogs(ev.Text, ev.User)
 			}
-			if ev.BotID == b.id && ev.Channel == b.blindTestChannelID {
-				go b.log(b.newChallenge(ev))
+			if ev.SubType == "bot_message" && ev.BotID == b.id {
+				go b.newChallenge(ev)
 			}
 			if ev.Channel == b.blindTestChannelID && ev.ThreadTimestamp != ev.Timestamp && ev.ThreadTimestamp != "" {
 				go b.log(b.validateAnswer(ev))

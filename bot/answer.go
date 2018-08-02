@@ -17,11 +17,11 @@ var (
 )
 
 func (b *BlindBot) validateAnswer(ev *slack.MessageEvent) error {
-	log.Println(b.getUsername(ev.User) + " tried " + ev.Text)
 	b.Lock()
 	entry, exist := b.entriesByThreadID[ev.ThreadTimestamp]
 	defer b.Unlock()
 	if exist && entry.submitterID != ev.User && entry.winnerID == "" {
+		log.Println(b.getUsername(ev.User) + " tried " + ev.Text + " on " + entry.hashedYoutubeID)
 		if matchAnswers(ev.Text, entry.answers) {
 			b.entries[entry.hashedYoutubeID].winnerID = ev.User
 			err := b.writeClient.AddReaction("clap", slack.NewRefToMessage(ev.Channel, ev.Timestamp))
@@ -35,7 +35,7 @@ func (b *BlindBot) validateAnswer(ev *slack.MessageEvent) error {
 	return nil
 }
 
-func (b *BlindBot) newChallenge(ev *slack.MessageEvent) error {
+func (b *BlindBot) newChallenge(ev *slack.MessageEvent) {
 	log.Println("new challenge detected " + ev.Text)
 	matches := b.domainRegex.FindStringSubmatch(ev.Text)
 	if len(matches) != 0 {
@@ -45,7 +45,6 @@ func (b *BlindBot) newChallenge(ev *slack.MessageEvent) error {
 		b.Unlock()
 		b.updateThread(entry, ev.Timestamp)
 	}
-	return nil
 }
 
 func isMn(r rune) bool {
