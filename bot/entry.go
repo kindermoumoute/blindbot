@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,9 +20,9 @@ const (
 )
 
 type entry struct {
-	submitterID, hashedYoutubeID, winnerID, answers string
-	submissionDate                                  time.Time
-	docID                                           int
+	submitterID, hashedYoutubeID, winnerID, answers, threadID string
+	submissionDate                                            time.Time
+	docID                                                     int
 }
 
 func scanEntries(db *db.DB) map[string]*entry {
@@ -88,6 +89,12 @@ func scanEntriesFromdb(entriesDB *db.Col) map[string]*entry {
 			winnerID:        entryDoc["winnerID"].(string),
 			docID:           id,
 		}
+
+		threadID, exist := entryDoc["threadID"]
+		if exist && threadID != nil {
+			entry.threadID = threadID.(string)
+		}
+
 		entry.submissionDate, _ = time.Parse(time.RFC3339, entryDoc["submissionDate"].(string))
 
 		entriesMap[entry.hashedYoutubeID] = entry
@@ -113,6 +120,7 @@ func (b *BlindBot) addEntry(entry *entry) error {
 	b.Lock()
 	firstEntry, exist := b.entries[entry.hashedYoutubeID]
 	if exist {
+		os.Remove(entry.Path())
 		return fmt.Errorf("this video is being submitted by %s", b.getUsername(firstEntry.submitterID))
 	}
 	b.entries[entry.hashedYoutubeID] = entry
@@ -135,11 +143,42 @@ func (e entry) toMap() map[string]interface{} {
 		"submissionDate":  e.submissionDate,
 		"answers":         e.answers,
 		"winnerID":        e.winnerID,
+		"threadID":        e.threadID,
 	}
 }
 
+func (b *BlindBot) updateEntry(entry *entry) error {
+	return b.db.Use(EntryCollection).Update(entry.docID, entry.toMap())
+}
+
+func (b *BlindBot) updateAnswers(entry *entry, answers string) error {
+	b.Lock()
+	b.entries[entry.hashedYoutubeID].answers = answers
+	b.Unlock()
+	err := b.updateEntry(entry)
+	if err == nil {
+		err = fmt.Errorf("Successfully updated answers. :+1:")
+	}
+	return err
+}
+
+func (b *BlindBot) updateWinner(entry *entry, winnerID string) error {
+	b.Lock()
+	b.entries[entry.hashedYoutubeID].winnerID = winnerID
+	b.Unlock()
+	return b.updateEntry(entry)
+}
+
+func (b *BlindBot) updateThread(entry *entry, threadID string) error {
+	b.Lock()
+	b.entries[entry.hashedYoutubeID].threadID = threadID
+	b.entriesByThreadID[entry.threadID] = entry
+	b.Unlock()
+	return b.updateEntry(entry)
+}
+
 func (e entry) String() string {
-	return e.hashedYoutubeID + " " + e.submitterID + e.submissionDate.Format(" 20060102150405 ") + e.answers + " " + strconv.Itoa(e.docID)
+	return e.hashedYoutubeID + " " + e.submitterID + e.submissionDate.Format(" 20060102150405 ") + e.answers + " " + e.winnerID + " " + e.threadID + " " + strconv.Itoa(e.docID)
 }
 
 func (e entry) Path() string {

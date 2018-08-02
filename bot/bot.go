@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -20,10 +21,12 @@ type BlindBot struct {
 	masterID           string
 	id                 string
 	domain             string
+	domainRegex        *regexp.Regexp
 	blindTestChannelID string
 	logger             *log.Logger
 	users              map[string]*user
 	entries            map[string]*entry
+	entriesByThreadID  map[string]*entry
 
 	client *slack.Client
 	rtm    *slack.RTM
@@ -38,17 +41,20 @@ type SlackMessage struct {
 func New(debug bool, key, masterEmail, domain, botName, BlindTestChannel string, db *db.DB) (*BlindBot, error) {
 	var err error
 	b := &BlindBot{
-		users:   make(map[string]*user),
-		entries: scanEntries(db),
-		domain:  domain,
-		client:  slack.New(key),
-		logger:  log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
-		db:      db,
+		users:             make(map[string]*user),
+		entriesByThreadID: make(map[string]*entry),
+		entries:           scanEntries(db),
+		domain:            domain,
+		domainRegex:       regexp.MustCompile(strings.Replace(domain, ".", `\.`, -1) + `\/music\/(.*)$`),
+		client:            slack.New(key),
+		logger:            log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
+		db:                db,
 	}
 
 	slack.SetLogger(b.logger)
 	b.client.SetDebug(debug)
 
+	// TODO: store users in database
 	// scan existing users
 	err = b.scanUsers(masterEmail, botName)
 	if err != nil {
@@ -63,6 +69,24 @@ func New(debug bool, key, masterEmail, domain, botName, BlindTestChannel string,
 	for _, channel := range channels {
 		if channel.Name == BlindTestChannel {
 			b.blindTestChannelID = channel.ID
+
+			// this part will be deprecated
+			myMessages, err := b.client.SearchMessages("from:"+botName+" in:"+BlindTestChannel, slack.NewSearchParameters())
+			if err != nil {
+				b.log(err)
+			}
+			for _, entry := range b.entries {
+				if entry.threadID == "" {
+					for _, message := range myMessages.Matches {
+						if strings.Contains(message.Text, entry.Path()) {
+							b.log("Updating threadID for ", entry.hashedYoutubeID)
+							b.updateThread(entry, message.Timestamp)
+						}
+					}
+				}
+			}
+			// end of deprecation
+
 			return b, nil
 		}
 	}
@@ -90,6 +114,13 @@ func (b *BlindBot) Run() {
 			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.id+">") {
 				go b.submitWithLogs(ev.Text, ev.User)
 			}
+			if ev.BotID == b.id && ev.Channel == b.blindTestChannelID {
+				go b.log(b.newChallenge(ev))
+			}
+			if ev.Channel == b.blindTestChannelID && ev.ThreadTimestamp != ev.Timestamp {
+				b.validateAnswer(ev)
+			}
+
 			if ev.Channel == b.masterChannelID() && strings.Contains(ev.Text, "show entries") {
 				b.Lock()
 				for _, entry := range b.entries {
