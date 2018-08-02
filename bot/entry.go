@@ -108,15 +108,17 @@ func newEntry(youtubeID, submitterID, answers string, submissionDate time.Time) 
 	}
 }
 
-func (b *BlindBot) addEntry(entry *entry) {
+func (b *BlindBot) addEntry(entry *entry) error {
 	var err error
 	b.Lock()
+	firstEntry, exist := b.entries[entry.hashedYoutubeID]
+	if exist {
+		return fmt.Errorf("this video is being submitted by %s", b.getUsername(firstEntry.submitterID))
+	}
 	b.entries[entry.hashedYoutubeID] = entry
 	b.Unlock()
 	entry.docID, err = b.db.Use(EntryCollection).Insert(entry.toMap())
-	if err != nil {
-		b.log(err)
-	}
+	return err
 }
 
 func (b *BlindBot) getEntry(youtubeID string) (entry *entry, exist bool) {
@@ -142,6 +144,10 @@ func (e entry) String() string {
 
 func (e entry) Path() string {
 	return rootPath + e.hashedYoutubeID + "-" + e.submitterID + e.submissionDate.Format("-20060102150405") + ".mp3"
+}
+
+func (b *BlindBot) AnnouncementMessage(hints string, entry *entry) string {
+	return fmt.Sprintf("%s %s submitted a new challenge: %s://%s%s", hints, b.getUsername(entry.submitterID), httpRoot, b.domain, entry.Path())
 }
 
 func encryptYoutubeID(youtubeID string) string {

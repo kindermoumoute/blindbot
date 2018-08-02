@@ -128,9 +128,11 @@ func (b *BlindBot) createEntry(youtubeID, submitterID, answers, hints string) er
 	}
 
 	// create new entry
-	b.addEntry(entry)
-	s := fmt.Sprintf("%s %s submitted a new challenge: %s://%s%s", hints, b.users[submitterID].name, httpRoot, b.domain, entry.Path())
-	b.announce(s, b.blindTestChannelID)
+	err = b.addEntry(entry)
+	if err != nil {
+		return err
+	}
+	b.announce(b.AnnouncementMessage(hints, entry), b.blindTestChannelID)
 
 	return nil
 }
