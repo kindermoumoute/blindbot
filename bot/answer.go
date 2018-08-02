@@ -35,18 +35,6 @@ func (b *BlindBot) validateAnswer(ev *slack.MessageEvent) error {
 	return nil
 }
 
-func (b *BlindBot) newChallenge(ev *slack.MessageEvent) {
-	log.Println("new challenge detected " + ev.Text)
-	matches := b.domainRegex.FindStringSubmatch(ev.Text)
-	if len(matches) != 0 {
-		b.Lock()
-		// if deleting this function catch the ID in the link another way
-		entry := newEntryFromString(matches[1], b.entries)
-		b.Unlock()
-		b.updateThread(entry, ev.Timestamp)
-	}
-}
-
 func isMn(r rune) bool {
 	return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks
 }

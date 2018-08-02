@@ -123,9 +123,6 @@ func (b *BlindBot) Run() {
 			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.id+">") {
 				go b.submitWithLogs(ev.Text, ev.User)
 			}
-			if ev.SubType == "bot_message" && ev.BotID == b.id {
-				go b.newChallenge(ev)
-			}
 			if ev.Channel == b.blindTestChannelID && ev.ThreadTimestamp != ev.Timestamp && ev.ThreadTimestamp != "" {
 				go b.log(b.validateAnswer(ev))
 			}
@@ -177,11 +174,17 @@ func (b *BlindBot) log(v interface{}, userIDs ...string) {
 	b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, b.masterChannelID()))
 }
 
-func (b *BlindBot) announce(v interface{}, channelIDs ...string) {
+func (b *BlindBot) announce(v interface{}, channelIDs ...string) []string {
+	threadIDs := []string{}
 	s := fmt.Sprintf("%v", v)
 	for _, channelID := range channelIDs {
-		b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, channelID))
+		params := slack.NewPostMessageParameters()
+		params.AsUser = true
+		_, threadID, _ := b.writeClient.PostMessage(channelID, s, params)
+		threadIDs = append(threadIDs, threadID)
+		//b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, channelID))
 	}
+	return threadIDs
 }
 
 func (b *BlindBot) masterChannelID() string {

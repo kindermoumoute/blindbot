@@ -132,7 +132,9 @@ func (b *BlindBot) createEntry(youtubeID, submitterID, answers, hints string) er
 	if err != nil {
 		return err
 	}
-	b.announce(b.AnnouncementMessage(hints, entry), b.blindTestChannelID)
+
+	threadID := b.announce(b.AnnouncementMessage(hints, entry), b.blindTestChannelID)[0]
+	b.updateThread(entry, threadID)
 
 	return nil
 }
