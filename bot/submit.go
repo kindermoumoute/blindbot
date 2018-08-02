@@ -77,7 +77,7 @@ func (b *BlindBot) submit(text, submitterID string) error {
 	// check if this entry already exists
 	entry, exist := b.getEntry(youtubeID)
 	if exist {
-		if entry.submitterID == submitterID {
+		if entry.submitterID == submitterID || submitterID == b.masterID {
 			return b.updateAnswers(entry, answers)
 		}
 		return fmt.Errorf("this video has already been submitted by %s: %s://%s%s", b.getUsername(entry.submitterID), httpRoot, b.domain, entry.Path())

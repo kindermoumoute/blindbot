@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -20,14 +21,16 @@ type BlindBot struct {
 	masterID           string
 	id                 string
 	domain             string
+	domainRegex        *regexp.Regexp
 	blindTestChannelID string
 	logger             *log.Logger
 	users              map[string]*user
 	entries            map[string]*entry
+	entriesByThreadID  map[string]*entry
 
-	client *slack.Client
-	rtm    *slack.RTM
-	db     *db.DB
+	writeClient, readClient *slack.Client
+	rtm                     *slack.RTM
+	db                      *db.DB
 }
 
 type SlackMessage struct {
@@ -35,27 +38,31 @@ type SlackMessage struct {
 	TeamID int
 }
 
-func New(debug bool, key, masterEmail, domain, botName, BlindTestChannel string, db *db.DB) (*BlindBot, error) {
+func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChannel string, db *db.DB) (*BlindBot, error) {
 	var err error
 	b := &BlindBot{
-		users:   make(map[string]*user),
-		entries: scanEntries(db),
-		domain:  domain,
-		client:  slack.New(key),
-		logger:  log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
-		db:      db,
+		users:             make(map[string]*user),
+		entriesByThreadID: make(map[string]*entry),
+		entries:           scanEntries(db),
+		domain:            domain,
+		domainRegex:       regexp.MustCompile(strings.Replace(domain, ".", `\.`, -1) + `\/music\/(.*)$`),
+		writeClient:       slack.New(key),
+		readClient:        slack.New(oauth2key),
+		logger:            log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
+		db:                db,
 	}
 
 	slack.SetLogger(b.logger)
-	b.client.SetDebug(debug)
+	b.writeClient.SetDebug(debug)
 
+	// TODO: store users in database
 	// scan existing users
 	err = b.scanUsers(masterEmail, botName)
 	if err != nil {
 		return nil, err
 	}
 
-	channels, err := b.client.GetChannels(true)
+	channels, err := b.writeClient.GetChannels(true)
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +70,32 @@ func New(debug bool, key, masterEmail, domain, botName, BlindTestChannel string,
 	for _, channel := range channels {
 		if channel.Name == BlindTestChannel {
 			b.blindTestChannelID = channel.ID
+
+			// this part will be deprecated when the database is updated
+			for i := 0; i < 4; i++ {
+				searchParams := slack.NewSearchParameters()
+				searchParams.Page = i + 1
+				history, err := b.readClient.SearchMessages("from:"+botName+" in:"+BlindTestChannel, searchParams)
+				if err != nil {
+					log.Println(err)
+				}
+
+				for _, message := range history.Matches {
+					log.Printf("Message \"%s\" %s \n", message.Text, message.User)
+				}
+				for _, entry := range b.entries {
+					if entry.threadID == "" {
+						log.Printf("Entry %s has no threadID\n", entry.hashedYoutubeID)
+						for _, message := range history.Matches {
+							if message.User == b.id && strings.Contains(message.Text, entry.Path()) {
+								log.Println("Updating threadID for ", entry.hashedYoutubeID)
+								b.updateThread(entry, message.Timestamp)
+							}
+						}
+					}
+				}
+			}
+			// end of deprecation
 			return b, nil
 		}
 	}
@@ -71,11 +104,13 @@ func New(debug bool, key, masterEmail, domain, botName, BlindTestChannel string,
 }
 
 func (b *BlindBot) Run() {
-	b.rtm = b.client.NewRTM()
+	b.rtm = b.writeClient.NewRTM()
 	go b.rtm.ManageConnection()
 	for msg := range b.rtm.IncomingEvents {
 		switch ev := msg.Data.(type) {
 		case *slack.ConnectedEvent:
+
+			// this part will be deprecated when users are stored in the database
 			for userID := range b.users {
 				_, _, channel, err := b.rtm.OpenIMChannel(userID)
 				if err != nil {
@@ -84,18 +119,38 @@ func (b *BlindBot) Run() {
 				}
 				b.users[userID].channelID = channel
 			}
+			// end of deprecation
+
 			b.log("Hello Master.")
 
 		case *slack.MessageEvent:
 			if ev.SubType == "" && strings.Contains(ev.Text, "<@"+b.id+">") {
 				go b.submitWithLogs(ev.Text, ev.User)
 			}
+			if ev.BotID == b.id && ev.Channel == b.blindTestChannelID {
+				go b.log(b.newChallenge(ev))
+			}
+			if ev.Channel == b.blindTestChannelID && ev.ThreadTimestamp != ev.Timestamp && ev.ThreadTimestamp != "" {
+				go b.log(b.validateAnswer(ev))
+			}
+
 			if ev.Channel == b.masterChannelID() && strings.Contains(ev.Text, "show entries") {
-				b.Lock()
-				for _, entry := range b.entries {
-					b.announce(entry, b.masterChannelID())
-				}
-				b.Unlock()
+				go func() {
+					b.Lock()
+					message := ""
+					count := 0
+					for _, entry := range b.entries {
+						message += entry.String() + "\n"
+						count++
+						if count%50 == 0 {
+							b.announce(message, b.masterChannelID())
+							message = ""
+						}
+					}
+
+					b.announce(message, b.masterChannelID())
+					b.Unlock()
+				}()
 			}
 		case *slack.InvalidAuthEvent:
 			b.logger.Printf("Invalid credentials")
