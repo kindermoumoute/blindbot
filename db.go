@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	collectionsDefault = []string{bot.EntryCollection, "players"}
+	collectionsDefault = []string{bot.EntryCollection}
 )
 
 var dbPath string
@@ -29,15 +29,8 @@ func initDB() *db.DB {
 		panic(err)
 	}
 
-	allCollections := myDB.AllCols()
 	for _, collectionName := range collectionsDefault {
-		exist := false
-		for _, name := range allCollections {
-			if name == collectionName {
-				exist = true
-			}
-		}
-		if !exist {
+		if !myDB.ColExists(collectionName) {
 			log.Println("Create collection", collectionName)
 			if err := myDB.Create(collectionName); err != nil {
 				panic(err)

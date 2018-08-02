@@ -2,6 +2,7 @@
 
 
 [[projects]]
+  branch = "master"
   name = "github.com/HouzuoGuo/tiedot"
   packages = [
     "data",
@@ -10,8 +11,7 @@
     "gommap",
     "tdlog"
   ]
-  revision = "96fa90b5e4620f677d2737bc5358329040942adb"
-  version = "3.4"
+  revision = "791033267fb3d7b02f0465a2527e8048485ee506"
 
 [[projects]]
   name = "github.com/PuerkitoBio/goquery"
@@ -92,6 +92,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "165fa607629d981f5b27c41cb70ce3512ef7372c9b2458af0a62e5b54363cc5b"
+  inputs-digest = "533a999d44243985d8689e04a214ea0ed48b53a4d204d3aaa6b0c808f3f308be"
   solver-name = "gps-cdcl"
   solver-version = 1
