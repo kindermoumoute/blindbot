@@ -1,14 +1,18 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
+	"strings"
+
 	"github.com/gorilla/mux"
 	"github.com/kindermoumoute/blindbot/bot"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 type FileInfo struct {
@@ -32,28 +36,22 @@ func runServer(b *bot.BlindBot) {
 	r.HandleFunc(musicPrefix+"{path}", file)
 
 	go func() {
-		// switch to :http
-		if err := http.ListenAndServe(":https", http.HandlerFunc(redirectTLS)); err != nil {
-			log.Fatalf("ListenAndServe error: %v", err)
-		}
+		// TODO: Use redirectTLS instead
+		log.Fatal(http.ListenAndServe(":http", r))
 	}()
 
-	// remove this
-	log.Fatal(http.ListenAndServe(":http", r))
+	m := &autocert.Manager{
+		Cache:      autocert.DirCache(secretDir),
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(strings.Split(domains, ",")...),
+	}
 
-	// uncomment this
-	//m := &autocert.Manager{
-	//	Cache:      autocert.DirCache(secretDir),
-	//	Prompt:     autocert.AcceptTOS,
-	//	HostPolicy: autocert.HostWhitelist(domain),
-	//}
-	//
-	//ln, err := tls.Listen("tcp", ":https", m.TLSConfig())
-	//if err != nil {
-	//	log.Fatalf("ssl listener %v", err)
-	//}
-	//
-	//log.Fatal(http.Serve(ln, r))
+	ln, err := tls.Listen("tcp", ":https", m.TLSConfig())
+	if err != nil {
+		log.Fatalf("ssl listener %v", err)
+	}
+
+	log.Fatal(http.Serve(ln, r))
 
 }
 

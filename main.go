@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"strings"
+
 	"github.com/kindermoumoute/blindbot/bot"
 )
 
@@ -12,7 +14,7 @@ var debug bool
 var botUserKey string
 var key string
 var masterEmail string
-var domain string
+var domains string
 var botName string
 var channel string
 var dbPath string
@@ -22,7 +24,7 @@ func init() {
 	flag.StringVar(&botUserKey, "botUserKey", os.Getenv("SLACK_KEY"), "Set Slack bot User Key")
 	flag.StringVar(&key, "key", os.Getenv("SLACK_OAUTH2_KEY"), "Set Slack oauth2 API key")
 	flag.StringVar(&masterEmail, "masterEmail", os.Getenv("SLACK_MASTER"), "Set Slack master email")
-	flag.StringVar(&domain, "domain", os.Getenv("DOMAIN_NAME"), "Set server domain name")
+	flag.StringVar(&domains, "domains", os.Getenv("DOMAIN_NAMES"), "Set server domains name")
 	flag.StringVar(&botName, "name", "blindbot", "Set bot user name")
 	flag.StringVar(&channel, "channel", "blindtest", "Set blind test channel")
 	flag.StringVar(&dbPath, "dbpath", "/db", "Set database directory")
@@ -33,7 +35,16 @@ func init() {
 }
 
 func main() {
-	blindbot, err := bot.New(debug, botUserKey, key, masterEmail, domain, botName, channel, dbPath)
+	blindbot, err := bot.New(
+		debug,
+		botUserKey,
+		key,
+		masterEmail,
+		botName,
+		channel,
+		dbPath,
+		strings.Split(domains, ","),
+	)
 	if err != nil {
 		panic(err)
 	}
