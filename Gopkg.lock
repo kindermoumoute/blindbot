@@ -83,6 +83,8 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = [
+    "acme",
+    "acme/autocert",
     "blake2b",
     "ssh/terminal"
   ]
@@ -123,6 +125,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6a97f4ccf7e9ec02cf0b3429ee27e35b0f9575ae452f5e74fe85a03ca27019ca"
+  inputs-digest = "8077636d2ab07dbcc174a5c74effd8e9ab125955ed2d04e1e8167028a8d7a665"
   solver-name = "gps-cdcl"
   solver-version = 1

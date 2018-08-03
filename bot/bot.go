@@ -39,7 +39,7 @@ type SlackMessage struct {
 	TeamID int
 }
 
-func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChannel string, dbPath string) (*BlindBot, error) {
+func New(debug bool, key, oauth2key, masterEmail, botName, BlindTestChannel, dbPath string, domain []string) (*BlindBot, error) {
 	var err error
 	db := InitDB(dbPath)
 	b := &BlindBot{
@@ -47,8 +47,8 @@ func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChan
 		entriesByThreadID: make(map[string]*entry),
 		entries:           scanEntriesFromdb(db.Use(EntryCollection)),
 		name:              botName,
-		domain:            domain,
-		domainRegex:       regexp.MustCompile(strings.Replace(domain, ".", `\.`, -1) + `\/music\/(.*)$`),
+		domain:            domain[0],
+		domainRegex:       regexp.MustCompile(strings.Replace(domain[0], ".", `\.`, -1) + `\/music\/(.*)$`),
 		writeClient:       slack.New(key),
 		readClient:        slack.New(oauth2key),
 		logger:            log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
