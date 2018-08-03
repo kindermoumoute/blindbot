@@ -16,7 +16,7 @@ import (
 
 const (
 	submissionLimit = 5
-	httpRoot        = "http"
+	httpRoot        = "https"
 )
 
 var (
