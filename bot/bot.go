@@ -149,6 +149,7 @@ func (b *BlindBot) announce(v interface{}, channelIDs ...string) []string {
 		params := slack.NewPostMessageParameters()
 		params.AsUser = true
 		params.LinkNames = 1
+		params.UnfurlLinks = true
 		_, threadID, _ := b.writeClient.PostMessage(channelID, s, params)
 		threadIDs = append(threadIDs, threadID)
 	}
