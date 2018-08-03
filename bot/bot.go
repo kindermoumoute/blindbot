@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -22,7 +21,6 @@ type BlindBot struct {
 	id                 string
 	name               string
 	domain             string
-	domainRegex        *regexp.Regexp
 	blindTestChannelID string
 	logger             *log.Logger
 	users              map[string]*user
@@ -48,7 +46,6 @@ func New(debug bool, key, oauth2key, masterEmail, botName, BlindTestChannel, dbP
 		entries:           scanEntriesFromdb(db.Use(EntryCollection)),
 		name:              botName,
 		domain:            domain[0],
-		domainRegex:       regexp.MustCompile(strings.Replace(domain[0], ".", `\.`, -1) + `\/music\/(.*)$`),
 		writeClient:       slack.New(key),
 		readClient:        slack.New(oauth2key),
 		logger:            log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),

@@ -35,16 +35,15 @@ func runServer(b *bot.BlindBot) {
 	r.HandleFunc(musicPrefix, file)
 	r.HandleFunc(musicPrefix+"{path}", file)
 
-	go func() {
-		// TODO: Use redirectTLS instead
-		log.Fatal(http.ListenAndServe(":http", r))
-	}()
-
 	m := &autocert.Manager{
 		Cache:      autocert.DirCache(secretDir),
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(strings.Split(domains, ",")...),
 	}
+	go func() {
+		// TODO: replace with `m.HTTPHandler(nil)` when https is stable
+		log.Fatal(http.ListenAndServe(":http", m.HTTPHandler(r)))
+	}()
 
 	ln, err := tls.Listen("tcp", ":https", m.TLSConfig())
 	if err != nil {
@@ -53,11 +52,6 @@ func runServer(b *bot.BlindBot) {
 
 	log.Fatal(http.Serve(ln, r))
 
-}
-
-func redirectTLS(w http.ResponseWriter, r *http.Request) {
-	// switch to https
-	http.Redirect(w, r, "http://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
 }
 
 func playerMainFrame(w http.ResponseWriter, r *http.Request) {
