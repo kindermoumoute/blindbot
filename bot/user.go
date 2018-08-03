@@ -12,10 +12,10 @@ var (
 
 type user struct {
 	sync.Mutex
-	name               string
-	requestVeilleCount int
-	requestLimit       int
-	channelID          string
+	name      string
+	wins      int // unimplemented
+	rateLimit int
+	channelID string
 }
 
 func (b *BlindBot) scanUsers(masterEmail, botName string) error {
@@ -51,7 +51,7 @@ func (b *BlindBot) getUsername(userID string) string {
 
 func (u *user) increaseRateLimit() {
 	u.Lock()
-	u.requestLimit++
+	u.rateLimit++
 }
 
 func (u *user) decreaseRateLimit() {
@@ -60,7 +60,7 @@ func (u *user) decreaseRateLimit() {
 	go func() {
 		time.Sleep(time.Minute)
 		u.Lock()
-		u.requestLimit--
+		u.rateLimit--
 		u.Unlock()
 	}()
 }

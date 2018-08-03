@@ -1,28 +1,19 @@
-package main
+package bot
 
 import (
-	"flag"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"log"
-
 	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/kindermoumoute/blindbot/bot"
 )
 
 var (
-	collectionsDefault = []string{bot.EntryCollection}
+	collectionsDefault = []string{EntryCollection}
 )
 
-var dbPath string
-
-func init() {
-	flag.StringVar(&dbPath, "dbpath", "/db", "Set database directory")
-}
-
-func initDB() *db.DB {
+func InitDB(dbPath string) *db.DB {
 	// (Create if not exist) open a database
 	myDB, err := db.OpenDB(dbPath)
 	if err != nil {

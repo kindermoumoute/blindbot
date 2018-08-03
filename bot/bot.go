@@ -20,6 +20,7 @@ type BlindBot struct {
 	sync.Mutex
 	masterID           string
 	id                 string
+	name               string
 	domain             string
 	domainRegex        *regexp.Regexp
 	blindTestChannelID string
@@ -38,12 +39,14 @@ type SlackMessage struct {
 	TeamID int
 }
 
-func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChannel string, db *db.DB) (*BlindBot, error) {
+func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChannel string, dbPath string) (*BlindBot, error) {
 	var err error
+	db := InitDB(dbPath)
 	b := &BlindBot{
 		users:             make(map[string]*user),
 		entriesByThreadID: make(map[string]*entry),
-		entries:           scanEntries(db),
+		entries:           scanEntriesFromdb(db.Use(EntryCollection)),
+		name:              botName,
 		domain:            domain,
 		domainRegex:       regexp.MustCompile(strings.Replace(domain, ".", `\.`, -1) + `\/music\/(.*)$`),
 		writeClient:       slack.New(key),
@@ -54,9 +57,6 @@ func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChan
 
 	slack.SetLogger(b.logger)
 	b.writeClient.SetDebug(debug)
-
-	b.syncEntries()
-	log.Printf("%d loaded, %d with threadID\n", len(b.entries), len(b.entriesByThreadID))
 
 	// TODO: store users in database
 	// scan existing users
@@ -73,21 +73,7 @@ func New(debug bool, key, oauth2key, masterEmail, domain, botName, BlindTestChan
 	for _, channel := range channels {
 		if channel.Name == BlindTestChannel {
 			b.blindTestChannelID = channel.ID
-			history, err := b.readClient.SearchMessages("from:"+botName+" in:"+BlindTestChannel, slack.NewSearchParameters())
-			if err != nil {
-				log.Println(err)
-			}
-			for _, entry := range b.entries {
-				if entry.threadID == "" {
-					log.Printf("Entry %s has no threadID\n", entry.hashedYoutubeID)
-					for _, message := range history.Matches {
-						if message.User == b.id && strings.Contains(message.Text, entry.Path()) {
-							log.Println("Updating threadID with ", message.Timestamp)
-							b.updateThread(entry, message.Timestamp)
-						}
-					}
-				}
-			}
+			b.syncEntries()
 			return b, nil
 		}
 	}
@@ -161,6 +147,7 @@ func (b *BlindBot) announce(v interface{}, channelIDs ...string) []string {
 	for _, channelID := range channelIDs {
 		params := slack.NewPostMessageParameters()
 		params.AsUser = true
+		params.LinkNames = 1
 		_, threadID, _ := b.writeClient.PostMessage(channelID, s, params)
 		threadIDs = append(threadIDs, threadID)
 	}

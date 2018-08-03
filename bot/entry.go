@@ -3,7 +3,6 @@ package bot
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/nlopes/slack"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -27,29 +27,6 @@ type entry struct {
 	submitterID, hashedYoutubeID, winnerID, answers, threadID string
 	submissionDate                                            time.Time
 	docID                                                     int
-}
-
-func scanEntries(db *db.DB) map[string]*entry {
-	entriesDB := db.Use(EntryCollection)
-	e := scanEntriesFromdb(entriesDB)
-
-	// scanning the rootPath will be deprecated
-	files, err := ioutil.ReadDir(rootPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, f := range files {
-		entry := newEntryFromString(f.Name(), e)
-		if entry != nil {
-			e[entry.hashedYoutubeID] = entry
-			log.Println("migrating " + entry.hashedYoutubeID + " to database")
-			e[entry.hashedYoutubeID].docID, err = entriesDB.Insert(entry.toMap())
-			if err != nil {
-				log.Println(err)
-			}
-		}
-	}
-	return e
 }
 
 // this function will be deprecated
@@ -122,6 +99,26 @@ func (b *BlindBot) syncEntries() {
 	for _, entry := range b.entries {
 		if entry.threadID != "" {
 			b.entriesByThreadID[entry.threadID] = entry
+		}
+	}
+
+	// if some entries do not match with a thread (should not happen)
+	if len(b.entriesByThreadID) != len(b.entries) {
+		b.log(strconv.Itoa(len(b.entries)-len(b.entriesByThreadID)) + " entries don't have a threadID\n")
+		history, err := b.readClient.SearchMessages("from:"+b.name+" in:"+b.blindTestChannelID, slack.NewSearchParameters())
+		if err != nil {
+			log.Println(err)
+		}
+		for _, entry := range b.entries {
+			if entry.threadID == "" {
+				log.Printf("Entry %s has no threadID\n", entry.hashedYoutubeID)
+				for _, message := range history.Matches {
+					if message.User == b.id && strings.Contains(message.Text, entry.Path()) {
+						log.Println("Updating threadID with ", message.Timestamp)
+						b.updateThread(entry, message.Timestamp)
+					}
+				}
+			}
 		}
 	}
 }

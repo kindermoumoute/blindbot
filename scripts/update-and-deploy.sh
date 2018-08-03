@@ -3,8 +3,8 @@
 VERSION=${VERSION:-latest}
 IMAGE=${IMAGE:-quay.io/kindermoumoute/blindbot}
 DOMAIN_NAME="example.org"
-SLACK_KEY="XXXXX..."
-SLACK_OAUTH2_KEY="XXXXXXXXXX..."
+SLACK_KEY="xoxb-XXXXX..."
+SLACK_OAUTH2_KEY="xoxp-XXXXXXXXXX..."
 SLACK_MASTER="master.email@domain.com"
 NAME=${NAME:-blindbot}
 

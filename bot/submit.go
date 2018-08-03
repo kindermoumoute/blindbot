@@ -84,8 +84,8 @@ func (b *BlindBot) submit(text, submitterID string) error {
 	}
 
 	// check is user is rate limited
-	if user.requestLimit >= submissionLimit {
-		return fmt.Errorf("%s requests in a minute, slow down!", strconv.Itoa(user.requestLimit))
+	if user.rateLimit >= submissionLimit {
+		return fmt.Errorf("%s requests in a minute, slow down!", strconv.Itoa(user.rateLimit))
 	}
 
 	// create entry
