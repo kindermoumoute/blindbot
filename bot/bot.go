@@ -92,7 +92,7 @@ func (b *BlindBot) Run() {
 			for userID := range b.users {
 				_, _, channel, err := b.rtm.OpenIMChannel(userID)
 				if err != nil {
-					log.Println("cannot get channel ID for user " + b.getUsername(userID))
+					log.Println("cannot get channel ID for user "+b.getUsername(userID), err)
 					continue
 				}
 				b.users[userID].channelID = channel
@@ -112,6 +112,10 @@ func (b *BlindBot) Run() {
 			if ev.Channel == b.masterChannelID() {
 				go b.log(b.masterCommands(ev))
 			}
+
+		case *slack.TeamJoinEvent:
+			// TODO: add user to db / in memory
+
 		case *slack.InvalidAuthEvent:
 			b.logger.Printf("Invalid credentials")
 			return
