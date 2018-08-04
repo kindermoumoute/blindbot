@@ -27,9 +27,9 @@ type BlindBot struct {
 	entries            map[string]*entry
 	entriesByThreadID  map[string]*entry
 
-	writeClient, readClient *slack.Client
-	rtm                     *slack.RTM
-	db                      *db.DB
+	botUserClient, client *slack.Client
+	rtm                   *slack.RTM
+	db                    *db.DB
 }
 
 type SlackMessage struct {
@@ -37,40 +37,42 @@ type SlackMessage struct {
 	TeamID int
 }
 
-func New(debug bool, key, oauth2key, masterEmail, botName, BlindTestChannel, dbPath string, domain []string) (*BlindBot, error) {
+func New(debug bool, botUserKey, key, masterEmail, botName, BlindTestChannel, dbPath string, domain []string) (*BlindBot, error) {
 	var err error
 	db := InitDB(dbPath)
 	b := &BlindBot{
-		users:             make(map[string]*user),
-		entriesByThreadID: make(map[string]*entry),
-		entries:           scanEntriesFromdb(db.Use(EntryCollection)),
-		name:              botName,
-		domain:            domain[0],
-		writeClient:       slack.New(key),
-		readClient:        slack.New(oauth2key),
-		logger:            log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
-		db:                db,
+		users:         make(map[string]*user),
+		name:          botName,
+		domain:        domain[0],
+		botUserClient: slack.New(botUserKey),
+		client:        slack.New(key),
+		logger:        log.New(os.Stdout, "slack-bot-"+botName+": ", log.Lshortfile|log.LstdFlags),
+		db:            db,
 	}
 
-	slack.SetLogger(b.logger)
-	b.writeClient.SetDebug(debug)
+	// load entries in memory
+	b.scanEntriesFromdb()
 
-	// TODO: store users in database
-	// scan existing users
+	// set up Slack logger
+	slack.SetLogger(b.logger)
+	b.botUserClient.SetDebug(debug)
+
+	// load users in memory from Slack API
+	// TODO: load users from database
 	err = b.scanUsers(masterEmail, botName)
 	if err != nil {
 		return nil, err
 	}
 
-	channels, err := b.writeClient.GetChannels(true)
+	// find blindtest channel ID
+	// TODO: use another method for that
+	channels, err := b.botUserClient.GetChannels(true)
 	if err != nil {
 		return nil, err
 	}
-
 	for _, channel := range channels {
 		if channel.Name == BlindTestChannel {
 			b.blindTestChannelID = channel.ID
-			b.syncEntries()
 			return b, nil
 		}
 	}
@@ -79,7 +81,7 @@ func New(debug bool, key, oauth2key, masterEmail, botName, BlindTestChannel, dbP
 }
 
 func (b *BlindBot) Run() {
-	b.rtm = b.writeClient.NewRTM()
+	b.rtm = b.botUserClient.NewRTM()
 	go b.rtm.ManageConnection()
 	for msg := range b.rtm.IncomingEvents {
 		switch ev := msg.Data.(type) {
@@ -142,7 +144,7 @@ func (b *BlindBot) log(v interface{}, userIDs ...string) {
 	b.rtm.SendMessage(b.rtm.NewOutgoingMessage(s, b.masterChannelID()))
 }
 
-func (b *BlindBot) announce(v interface{}, channelIDs ...string) []string {
+func (b *BlindBot) announce(v interface{}, channelIDs ...string) ([]string, error) {
 	threadIDs := []string{}
 	s := fmt.Sprintf("%v", v)
 	for _, channelID := range channelIDs {
@@ -150,10 +152,13 @@ func (b *BlindBot) announce(v interface{}, channelIDs ...string) []string {
 		params.AsUser = true
 		params.LinkNames = 1
 		params.UnfurlLinks = true
-		_, threadID, _ := b.writeClient.PostMessage(channelID, s, params)
+		_, threadID, err := b.botUserClient.PostMessage(channelID, s, params)
+		if err != nil {
+			return nil, err
+		}
 		threadIDs = append(threadIDs, threadID)
 	}
-	return threadIDs
+	return threadIDs, nil
 }
 
 func (b *BlindBot) masterChannelID() string {

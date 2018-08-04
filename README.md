@@ -14,7 +14,6 @@ When a player gives a right answer in the challenge's thread, blindbot adds an e
 
 ## Incoming features
 * Statistics (best player, best submitter, per day, per week).
-* https (almost done)
 * Spotify integration
 * Clean up files after a timeout (e.g. 2 weeks)
 * Draw an icon for blindbot
