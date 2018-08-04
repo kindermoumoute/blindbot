@@ -46,7 +46,7 @@ func TestEntries(t *testing.T) {
 	assert.NoError(t, err)
 
 	// get entry
-	entry, exist := b.getEntry(youtubeID)
+	entry, exist := b.getEntryFromYoutubeID(youtubeID)
 	assert.True(t, exist)
 
 	// update answers
@@ -71,7 +71,7 @@ func TestEntries(t *testing.T) {
 	assert.Len(t, b.entries, 1)
 	b.syncEntries()
 	assert.Len(t, b.entriesByThreadID, 1)
-	entry, exist = b.getEntry(youtubeID)
+	entry, exist = b.getEntryFromYoutubeID(youtubeID)
 	assert.True(t, exist)
 	assert.Equal(t, entry.answers, answers)
 	assert.Equal(t, entry.threadID, threadID)

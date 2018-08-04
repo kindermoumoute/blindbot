@@ -75,7 +75,7 @@ func (b *BlindBot) submit(text, submitterID string) error {
 	defer user.decreaseRateLimit()
 
 	// check if this entry already exists
-	entry, exist := b.getEntry(youtubeID)
+	entry, exist := b.getEntryFromYoutubeID(youtubeID)
 	if exist {
 
 		// the announcement failed previously

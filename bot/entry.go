@@ -120,9 +120,16 @@ func (b *BlindBot) addEntry(entry *entry) error {
 	return err
 }
 
-func (b *BlindBot) getEntry(youtubeID string) (entry *entry, exist bool) {
+func (b *BlindBot) getEntryFromYoutubeID(youtubeID string) (entry *entry, exist bool) {
 	b.Lock()
 	entry, exist = b.entries[encryptYoutubeID(youtubeID)]
+	b.Unlock()
+	return
+}
+
+func (b *BlindBot) getEntry(hashedYoutubeID string) (entry *entry, exist bool) {
+	b.Lock()
+	entry, exist = b.entries[hashedYoutubeID]
 	b.Unlock()
 	return
 }
