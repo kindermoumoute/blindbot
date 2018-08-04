@@ -142,7 +142,7 @@ func (b *BlindBot) createEntry(youtubeID, submitterID, answers, hints string) er
 	}
 
 	// download mp3
-	entry := newEntry(youtubeID, submitterID, answers, time.Now())
+	entry := newEntry(youtubeID, submitterID, answers, hints, time.Now())
 	out, err := exec.Command("bash", "-c", "ffmpeg -i \""+url.String()+"\" -f mp3 -vn "+entry.Path()).Output()
 	if err != nil {
 		return fmt.Errorf("cannot convert video to mp3 %s %v", out, err)

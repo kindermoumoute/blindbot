@@ -25,6 +25,7 @@ type entry struct {
 	docID           int
 	answers         string
 	hashedYoutubeID string
+	hints           string
 	submitterID     string
 	threadID        string
 	youtubeID       string
@@ -75,7 +76,12 @@ func (b *BlindBot) scanEntriesFromdb() {
 			youtubeID:       entryDoc["youtubeID"].(string),
 			winnerID:        entryDoc["winnerID"].(string),
 		}
-
+		hints, exist := entryDoc["hints"]
+		if exist && hints != nil {
+			entry.hints = hints.(string)
+		} else {
+			fmt.Println("Cannot find hints for ", entry.hashedYoutubeID)
+		}
 		entry.submissionDate, _ = time.Parse(time.RFC3339, entryDoc["submissionDate"].(string))
 
 		b.entries[entry.hashedYoutubeID] = entry
@@ -86,9 +92,10 @@ func (b *BlindBot) scanEntriesFromdb() {
 	log.Println(len(b.entries), "entries loaded")
 }
 
-func newEntry(youtubeID, submitterID, answers string, submissionDate time.Time) *entry {
+func newEntry(youtubeID, submitterID, answers, hints string, submissionDate time.Time) *entry {
 	return &entry{
 		hashedYoutubeID: encryptYoutubeID(youtubeID),
+		hints:           hints,
 		youtubeID:       youtubeID,
 		submitterID:     submitterID,
 		submissionDate:  submissionDate,
@@ -138,6 +145,7 @@ func (e entry) toMap() map[string]interface{} {
 	return map[string]interface{}{
 		"answers":         e.answers,
 		"hashedYoutubeID": e.hashedYoutubeID,
+		"hints":           e.hints,
 		"submitterID":     e.submitterID,
 		"threadID":        e.threadID,
 		"youtubeID":       e.youtubeID,
@@ -171,6 +179,13 @@ func (b *BlindBot) updateYoutubeID(entry *entry, youtubeID string) error {
 func (b *BlindBot) updateWinner(entry *entry, winnerID string) error {
 	b.Lock()
 	b.entries[entry.hashedYoutubeID].winnerID = winnerID
+	b.Unlock()
+	return b.updateEntry(entry)
+}
+
+func (b *BlindBot) updateHints(entry *entry, hints string) error {
+	b.Lock()
+	b.entries[entry.hashedYoutubeID].hints = hints
 	b.Unlock()
 	return b.updateEntry(entry)
 }

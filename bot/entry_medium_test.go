@@ -38,7 +38,7 @@ func TestEntries(t *testing.T) {
 
 	// add an entry
 	assert.Empty(t, b.entries)
-	entry := newEntry(youtubeID, submitterID, "", time.Now())
+	entry := newEntry(youtubeID, submitterID, "", "", time.Now())
 	b.addEntry(entry)
 	assert.Equal(t, entry.youtubeID, youtubeID)
 	rootPath = testDir
