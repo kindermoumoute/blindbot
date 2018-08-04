@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	entryCommand = regexp.MustCompile("^delete entry (.*)$")
-	updateWinner = regexp.MustCompile("^update winner (.*) (.*)$")
+	entryCommand = regexp.MustCompile(`^delete entry (.*)$`)
+	updateWinner = regexp.MustCompile(`^update winner (.*) (.*) "(.*)"$`)
 )
 
 func (b *BlindBot) masterCommands(ev *slack.MessageEvent) error {
@@ -22,7 +22,11 @@ func (b *BlindBot) masterCommands(ev *slack.MessageEvent) error {
 	if len(matches) != 0 {
 		entry, exist := b.getEntry(matches[1])
 		if exist {
-			return b.updateWinner(entry, matches[2])
+			err := b.updateWinner(entry, matches[2])
+			if err != nil {
+				return err
+			}
+			return b.updateAnswers(entry, matches[3])
 		}
 		return fmt.Errorf("%s is not a valid entry", matches[1])
 	}
