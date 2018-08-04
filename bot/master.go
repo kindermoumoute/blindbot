@@ -2,10 +2,9 @@ package bot
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
-
-	"log"
 
 	"github.com/nlopes/slack"
 )

@@ -41,7 +41,6 @@ func runServer(b *bot.BlindBot) {
 		HostPolicy: autocert.HostWhitelist(strings.Split(domains, ",")...),
 	}
 	go func() {
-		// TODO: replace with `m.HTTPHandler(nil)` when https is stable
 		log.Fatal(http.ListenAndServe(":http", m.HTTPHandler(r)))
 	}()
 
