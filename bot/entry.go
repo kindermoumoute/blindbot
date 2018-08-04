@@ -154,6 +154,13 @@ func (b *BlindBot) updateAnswers(entry *entry, answers string) error {
 	return err
 }
 
+func (b *BlindBot) updateYoutubeID(entry *entry, youtubeID string) error {
+	b.Lock()
+	b.entries[entry.hashedYoutubeID].youtubeID = youtubeID
+	b.Unlock()
+	return b.updateEntry(entry)
+}
+
 func (b *BlindBot) updateWinner(entry *entry, winnerID string) error {
 	b.Lock()
 	b.entries[entry.hashedYoutubeID].winnerID = winnerID
@@ -194,7 +201,13 @@ func (b *BlindBot) deleteEntry(hashedYoutubeID string) error {
 }
 
 func (e entry) String() string {
-	return e.youtubeID + e.hashedYoutubeID + " " + e.submitterID + e.submissionDate.Format(" 20060102150405 ") + e.answers + " " + e.winnerID + " " + e.threadID + " " + strconv.Itoa(e.docID)
+	return e.youtubeID + " " +
+		e.hashedYoutubeID + " " +
+		e.submitterID + e.submissionDate.Format(" 20060102150405 ") +
+		e.answers + " " +
+		e.winnerID + " " +
+		e.threadID + " " +
+		strconv.Itoa(e.docID)
 }
 
 func (e entry) Path() string {

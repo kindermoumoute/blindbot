@@ -87,6 +87,14 @@ func (b *BlindBot) submit(text, submitterID string) error {
 			return b.updateThread(entry, threadIDs[0])
 		}
 
+		// the youtubeID is missing
+		if entry.youtubeID == "" {
+			err := b.updateYoutubeID(entry, youtubeID)
+			if err != nil {
+				return err
+			}
+		}
+
 		// the submitter update his answers
 		if entry.winnerID == "" && (entry.submitterID == submitterID || submitterID == b.masterID) {
 			return b.updateAnswers(entry, answers)
