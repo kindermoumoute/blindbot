@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -40,17 +39,18 @@ func runServer(b *bot.BlindBot) {
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(strings.Split(domains, ",")...),
 	}
+
+	server := &http.Server{
+		Handler:   r,
+		Addr:      ":https",
+		TLSConfig: m.TLSConfig(),
+	}
+
 	go func() {
 		log.Fatal(http.ListenAndServe(":http", m.HTTPHandler(r)))
 	}()
 
-	ln, err := tls.Listen("tcp", ":https", m.TLSConfig())
-	if err != nil {
-		log.Fatalf("ssl listener %v", err)
-	}
-
-	log.Fatal(http.Serve(ln, r))
-
+	log.Fatal(server.ListenAndServeTLS("", ""))
 }
 
 func playerMainFrame(w http.ResponseWriter, r *http.Request) {
