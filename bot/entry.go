@@ -67,23 +67,16 @@ func (b *BlindBot) scanEntriesFromdb() {
 		}
 
 		entry := &entry{
+			docID:           id,
+			answers:         entryDoc["answers"].(string),
 			hashedYoutubeID: entryDoc["hashedYoutubeID"].(string),
 			submitterID:     entryDoc["submitterID"].(string),
-			answers:         entryDoc["answers"].(string),
-			winnerID:        entryDoc["winnerID"].(string),
 			threadID:        entryDoc["threadID"].(string),
-			docID:           id,
+			youtubeID:       entryDoc["youtubeID"].(string),
+			winnerID:        entryDoc["winnerID"].(string),
 		}
 
 		entry.submissionDate, _ = time.Parse(time.RFC3339, entryDoc["submissionDate"].(string))
-
-		youtubeID, exist := entryDoc["youtubeID"]
-		if exist && youtubeID != nil {
-			entry.youtubeID = youtubeID.(string)
-		} else {
-			log.Println("Creating youtubeID object for entry ", entry.hashedYoutubeID)
-			b.updateEntry(entry)
-		}
 
 		b.entries[entry.hashedYoutubeID] = entry
 
