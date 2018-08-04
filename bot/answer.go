@@ -19,11 +19,11 @@ var (
 func (b *BlindBot) validateAnswer(ev *slack.MessageEvent) error {
 	b.Lock()
 	entry, exist := b.entriesByThreadID[ev.ThreadTimestamp]
-	defer b.Unlock()
+	b.Unlock()
 	if exist && entry.submitterID != ev.User && entry.winnerID == "" {
 		log.Println(b.getUsername(ev.User) + " tried " + ev.Text + " on " + entry.hashedYoutubeID)
 		if matchAnswers(ev.Text, entry.answers) {
-			b.entries[entry.hashedYoutubeID].winnerID = ev.User
+			b.updateWinner(entry, ev.User)
 			err := b.botUserClient.AddReaction("clap", slack.NewRefToMessage(ev.Channel, ev.Timestamp))
 			if err != nil {
 				return err
