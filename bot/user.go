@@ -23,7 +23,7 @@ func (b *BlindBot) scanUsers(masterEmail, botName string) error {
 		b.users = make(map[string]*user)
 	}
 
-	users, err := b.writeClient.GetUsers()
+	users, err := b.botUserClient.GetUsers()
 	if err != nil {
 		return err
 	}

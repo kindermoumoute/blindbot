@@ -24,13 +24,13 @@ func (b *BlindBot) validateAnswer(ev *slack.MessageEvent) error {
 		log.Println(b.getUsername(ev.User) + " tried " + ev.Text + " on " + entry.hashedYoutubeID)
 		if matchAnswers(ev.Text, entry.answers) {
 			b.entries[entry.hashedYoutubeID].winnerID = ev.User
-			err := b.writeClient.AddReaction("clap", slack.NewRefToMessage(ev.Channel, ev.Timestamp))
+			err := b.botUserClient.AddReaction("clap", slack.NewRefToMessage(ev.Channel, ev.Timestamp))
 			if err != nil {
 				return err
 			}
-			return b.writeClient.AddReaction("heavy_check_mark", slack.NewRefToMessage(ev.Channel, ev.ThreadTimestamp))
+			return b.botUserClient.AddReaction("heavy_check_mark", slack.NewRefToMessage(ev.Channel, ev.ThreadTimestamp))
 		}
-		return b.writeClient.AddReaction("x", slack.NewRefToMessage(ev.Channel, ev.Timestamp))
+		return b.botUserClient.AddReaction("x", slack.NewRefToMessage(ev.Channel, ev.Timestamp))
 	}
 	return nil
 }

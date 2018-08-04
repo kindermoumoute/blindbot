@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/nlopes/slack"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -24,9 +22,14 @@ var (
 )
 
 type entry struct {
-	submitterID, hashedYoutubeID, winnerID, answers, threadID string
-	submissionDate                                            time.Time
-	docID                                                     int
+	docID           int
+	answers         string
+	hashedYoutubeID string
+	submitterID     string
+	threadID        string
+	youtubeID       string
+	winnerID        string
+	submissionDate  time.Time
 }
 
 // this function will be deprecated
@@ -55,9 +58,9 @@ func newEntryFromString(entryString string, entries map[string]*entry) *entry {
 	}
 }
 
-func scanEntriesFromdb(entriesDB *db.Col) map[string]*entry {
-	entriesMap := make(map[string]*entry)
-	entriesDB.ForEachDoc(func(id int, docContent []byte) (willMoveOn bool) {
+func (b *BlindBot) scanEntriesFromdb() {
+	b.entries = make(map[string]*entry)
+	b.db.Use(EntryCollection).ForEachDoc(func(id int, docContent []byte) (willMoveOn bool) {
 		var entryDoc map[string]interface{}
 		if json.Unmarshal(docContent, &entryDoc) != nil {
 			log.Fatalln("cannot deserialize")
@@ -68,57 +71,44 @@ func scanEntriesFromdb(entriesDB *db.Col) map[string]*entry {
 			submitterID:     entryDoc["submitterID"].(string),
 			answers:         entryDoc["answers"].(string),
 			winnerID:        entryDoc["winnerID"].(string),
+			threadID:        entryDoc["threadID"].(string),
 			docID:           id,
-		}
-
-		threadID, exist := entryDoc["threadID"]
-		if exist && threadID != nil {
-			entry.threadID = threadID.(string)
 		}
 
 		entry.submissionDate, _ = time.Parse(time.RFC3339, entryDoc["submissionDate"].(string))
 
-		entriesMap[entry.hashedYoutubeID] = entry
+		youtubeID, exist := entryDoc["youtubeID"]
+		if exist && youtubeID != nil {
+			entry.youtubeID = youtubeID.(string)
+		} else {
+			log.Println("Creating youtubeID object for entry ", entry.hashedYoutubeID)
+			b.updateEntry(entry)
+		}
+
+		b.entries[entry.hashedYoutubeID] = entry
 
 		return true
 	})
-
-	log.Println(len(entriesMap), "entries loaded")
-	return entriesMap
+	b.syncEntries()
+	log.Println(len(b.entries), "entries loaded")
 }
 
 func newEntry(youtubeID, submitterID, answers string, submissionDate time.Time) *entry {
 	return &entry{
 		hashedYoutubeID: encryptYoutubeID(youtubeID),
+		youtubeID:       youtubeID,
 		submitterID:     submitterID,
 		submissionDate:  submissionDate,
 		answers:         answers,
 	}
 }
 func (b *BlindBot) syncEntries() {
+	b.entriesByThreadID = make(map[string]*entry)
 	for _, entry := range b.entries {
 		if entry.threadID != "" {
 			b.entriesByThreadID[entry.threadID] = entry
-		}
-	}
-
-	// if some entries do not match with a thread (should not happen)
-	if len(b.entriesByThreadID) != len(b.entries) {
-		b.log(strconv.Itoa(len(b.entries)-len(b.entriesByThreadID)) + " entries don't have a threadID\n")
-		history, err := b.readClient.SearchMessages("from:"+b.name+" in:"+b.blindTestChannelID, slack.NewSearchParameters())
-		if err != nil {
-			log.Println(err)
-		}
-		for _, entry := range b.entries {
-			if entry.threadID == "" {
-				log.Printf("Entry %s has no threadID\n", entry.hashedYoutubeID)
-				for _, message := range history.Matches {
-					if message.User == b.id && strings.Contains(message.Text, entry.Path()) {
-						log.Println("Updating threadID with ", message.Timestamp)
-						b.updateThread(entry, message.Timestamp)
-					}
-				}
-			}
+		} else {
+			fmt.Println("no thread ID for ", entry.hashedYoutubeID)
 		}
 	}
 }
@@ -146,12 +136,13 @@ func (b *BlindBot) getEntry(youtubeID string) (entry *entry, exist bool) {
 
 func (e entry) toMap() map[string]interface{} {
 	return map[string]interface{}{
-		"submitterID":     e.submitterID,
-		"hashedYoutubeID": e.hashedYoutubeID,
-		"submissionDate":  e.submissionDate,
 		"answers":         e.answers,
-		"winnerID":        e.winnerID,
+		"hashedYoutubeID": e.hashedYoutubeID,
+		"submitterID":     e.submitterID,
 		"threadID":        e.threadID,
+		"youtubeID":       e.youtubeID,
+		"winnerID":        e.winnerID,
+		"submissionDate":  e.submissionDate,
 	}
 }
 
@@ -210,7 +201,7 @@ func (b *BlindBot) deleteEntry(hashedYoutubeID string) error {
 }
 
 func (e entry) String() string {
-	return e.hashedYoutubeID + " " + e.submitterID + e.submissionDate.Format(" 20060102150405 ") + e.answers + " " + e.winnerID + " " + e.threadID + " " + strconv.Itoa(e.docID)
+	return e.youtubeID + e.hashedYoutubeID + " " + e.submitterID + e.submissionDate.Format(" 20060102150405 ") + e.answers + " " + e.winnerID + " " + e.threadID + " " + strconv.Itoa(e.docID)
 }
 
 func (e entry) Path() string {

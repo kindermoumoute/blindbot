@@ -29,18 +29,18 @@ func TestEntries(t *testing.T) {
 		panic(err)
 	}
 	assert.NoError(t, testDB.Create(EntryCollection))
-	entriesDB := testDB.Use(EntryCollection)
 
 	b := &BlindBot{
-		entries:           scanEntriesFromdb(entriesDB),
 		entriesByThreadID: make(map[string]*entry),
 		db:                testDB,
 	}
+	b.scanEntriesFromdb()
 
 	// add an entry
 	assert.Empty(t, b.entries)
 	entry := newEntry(youtubeID, submitterID, "", time.Now())
 	b.addEntry(entry)
+	assert.Equal(t, entry.youtubeID, youtubeID)
 	rootPath = testDir
 	err = ioutil.WriteFile(entry.Path(), []byte("music-data"), 0644)
 	assert.NoError(t, err)
@@ -67,7 +67,7 @@ func TestEntries(t *testing.T) {
 	assert.Equal(t, entry.winnerID, winner)
 
 	// reload from db
-	b.entries = scanEntriesFromdb(entriesDB)
+	b.scanEntriesFromdb()
 	assert.Len(t, b.entries, 1)
 	b.syncEntries()
 	assert.Len(t, b.entriesByThreadID, 1)
@@ -77,6 +77,8 @@ func TestEntries(t *testing.T) {
 	assert.Equal(t, entry.threadID, threadID)
 	assert.Equal(t, entry.winnerID, winner)
 	assert.Equal(t, entry.submitterID, submitterID)
+	assert.Equal(t, entry.youtubeID, youtubeID)
+	assert.Equal(t, entry.hashedYoutubeID, encryptYoutubeID(youtubeID))
 
 	// delete
 	err = b.deleteEntry(entry.hashedYoutubeID)

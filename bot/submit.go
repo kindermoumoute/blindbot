@@ -77,9 +77,22 @@ func (b *BlindBot) submit(text, submitterID string) error {
 	// check if this entry already exists
 	entry, exist := b.getEntry(youtubeID)
 	if exist {
-		if entry.submitterID == submitterID || submitterID == b.masterID {
+
+		// the announcement failed previously
+		if entry.threadID == "" {
+			threadIDs, err := b.announce(b.AnnouncementMessage(hints, entry), b.blindTestChannelID)
+			if err != nil {
+				return err
+			}
+			return b.updateThread(entry, threadIDs[0])
+		}
+
+		// the submitter update his answers
+		if entry.winnerID == "" && (entry.submitterID == submitterID || submitterID == b.masterID) {
 			return b.updateAnswers(entry, answers)
 		}
+
+		// already submitted
 		return fmt.Errorf("this video has already been submitted by %s: %s://%s%s", b.getUsername(entry.submitterID), httpRoot, b.domain, entry.Path())
 	}
 
@@ -117,7 +130,7 @@ func (b *BlindBot) createEntry(youtubeID, submitterID, answers, hints string) er
 	// get video URL
 	url, err := vid.GetDownloadURL(best)
 	if err != nil {
-		return fmt.Errorf("cannot genereate a download URL for this video %v", err)
+		return fmt.Errorf("cannot generate a download URL for this video %v", err)
 	}
 
 	// download mp3
@@ -133,8 +146,10 @@ func (b *BlindBot) createEntry(youtubeID, submitterID, answers, hints string) er
 		return err
 	}
 
-	threadID := b.announce(b.AnnouncementMessage(hints, entry), b.blindTestChannelID)[0]
-	b.updateThread(entry, threadID)
+	threadIDs, err := b.announce(b.AnnouncementMessage(hints, entry), b.blindTestChannelID)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return b.updateThread(entry, threadIDs[0])
 }
